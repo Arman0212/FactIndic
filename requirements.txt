@@ -1,0 +1,24 @@
+# Core Environment & Configuration
+python-dotenv>=1.0.0
+
+# LLM Provider APIs
+groq>=0.11.0
+google-genai>=0.1.1
+
+# Data Processing & Utilities
+datasets>=2.19.0
+pandas>=2.2.0
+tqdm>=4.66.0
+
+# NLP, Model Evaluation & Metrics
+transformers>=4.40.0
+torch>=2.2.0
+stanza>=1.8.0
+rouge-score>=0.1.2
+bert-score>=0.3.13
+
+# Visualizations & Plotting
+matplotlib>=3.8.0
+
+# Testing
+pytest>=8.0.0

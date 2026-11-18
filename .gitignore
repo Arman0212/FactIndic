@@ -1,0 +1,60 @@
+# Python bytecode & caching
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual environments
+venv/
+.venv/
+env/
+ENV/
+
+# Environment variables & secrets (CRITICAL: never commit API keys)
+.env
+.env.local
+.env.*
+!.env.example
+
+# Datasets (raw data is gitignored per requirements)
+data/raw/
+*.tar.gz
+*.zip
+
+# Large result files & cached artifacts
+results/*.csv
+results/*.json
+results/*.parquet
+!results/.gitkeep
+
+# NLP model cache & Hugging Face downloads
+stanza_resources/
+.cache/
+
+# Testing & Coverage
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Jupyter Notebook checkpoints
+.ipynb_checkpoints
+
+# Operating System files
+.DS_Store
+Thumbs.db
