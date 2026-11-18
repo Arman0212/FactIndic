@@ -103,3 +103,4 @@ FactIndic/
 - **Why Hindi and Hinglish?** Hindi is widely spoken yet resource-constrained in advanced NLP benchmarks; Hinglish is the de facto mode of digital communication across South Asia, presenting unique syntactic, morphological, and orthographic challenges for standard LLMs.
 - **Why Factuality-Aware Prompting over Fine-Tuning?** Fine-tuning requires massive annotated datasets of hallucinations and significant compute. Prompt engineering enables lightweight, modular, and explainable grounding mechanisms applicable across any black-box foundation model.
 - **Verification Strategy:** Combining deterministic symbolic checks (entity/number matching) with deep semantic models (mDeBERTa XNLI) provides a two-pronged, rigorous evaluation that avoids LLM self-evaluation bias.
+

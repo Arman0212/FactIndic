@@ -72,3 +72,4 @@ def test_rate_limit_retry_backoff():
                 assert text == "Recovered summary"
                 assert mock_caller.call_count == 2
                 mock_sleep.assert_called_once_with(0.1)
+

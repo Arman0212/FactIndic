@@ -140,3 +140,4 @@ For detailed descriptions of each phase, see [PROJECT.md](file:///Users/as/Deskt
    Hinglish lacks standardized spelling and grammar. Subword tokenizers often fragment Hinglish words into unnatural sub-tokens, increasing the risk of entity corruption and hallucination.
 3. **What makes the evaluation pipeline robust?**
    Traditional ROUGE and BLEU only measure n-gram overlap with reference summaries (which themselves may omit source facts). Our pipeline combines **symbolic verification** (exact entity & numerical matching) with **deep semantic verification** (cross-lingual NLI entailment).
+
