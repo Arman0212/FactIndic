@@ -95,7 +95,7 @@ Expected output:
 
 ## 📊 Dataset
 
-**Final file:** `data/processed/factindic.jsonl`: **186 Hindi-Hinglish pairs**. Fields: `id`, `title`, `text_hi`, `text_hinglish`, `ref_summary_hi`, `cmi`.
+**Final file:** `data/processed/factindic.jsonl`: **186 Hindi-Hinglish pairs**. Fields: `id`, `title`, `text_hi`, `text_hinglish`, `ref_summary_hi`, `cmi`, `text_hi_roman` (added in Phase 3, see below).
 
 1. **Source.** The Hindi test split of [XL-Sum](https://huggingface.co/datasets/csebuetnlp/xlsum) (BBC Hindi articles with one-sentence reference summaries; 8,847 articles). It is loaded from the Hugging Face parquet branch because newer `datasets` versions no longer run the XL-Sum loading script.
 2. **Filtering.** We kept articles of 150-500 words (5,610 articles) and sampled 300 with seed 42 (`data/raw/hindi_300.jsonl`). All text is cleaned with `src/text_utils.normalize()`: Unicode NFC, all dash variants become `-`, quotes are unified, and whitespace is collapsed.
@@ -127,7 +127,51 @@ python -m src.data.make_hinglish     # Hinglish generation (resumable)
 python -m src.data.check_hinglish    # flags -> data/processed/flagged.csv
 python -m src.data.fix_flagged       # retry once, drop failures -> factindic.jsonl
 python -m src.data.make_manual_sample
+python -m src.data.add_roman         # adds text_hi_roman (Phase 3)
 ```
+
+---
+
+## 📝 Summarization (Phase 3)
+
+Every article is summarized **6 times**: 3 input conditions × 2 prompts.
+
+| Condition | Source field | What changes compared with the row above |
+|---|---|---|
+| `hi` | `text_hi` | Devanagari Hindi (baseline) |
+| `hi_roman` | `text_hi_roman` | Only the **script** changes (same Hindi words) |
+| `hinglish` | `text_hinglish` | **Code-mixing** added (English words, same script) |
+
+**`text_hi_roman`** is a rule-based transliteration of the Hindi article made by `src/data/add_roman.py`. No LLM is involved.
+- It uses the ITRANS scheme from `indic-transliteration`, lowercased.
+- The silent final "a" is dropped (विमान becomes "viman", not "vimana"), and anusvara becomes "n" (में becomes "men").
+- Nukta letters, ऑ and zero-width characters are normalized before transliterating.
+- Only the final silent "a" is handled; the silent "a" inside words is not deleted, so उतरने becomes "utarane", not "utarne".
+
+**Prompts** (`prompts/summ_plain.txt` and `prompts/summ_factual.txt`):
+- **Plain:** "Summarize the following article in 2-3 sentences."
+- **Factual:** the same task plus strict grounding rules:
+  - use only information in the article;
+  - copy names, numbers, dates and amounts exactly;
+  - add no background knowledge, opinions or guesses;
+  - don't translate between English and Hindi in code-mixed text;
+  - leave out any fact you are unsure about.
+- **Output language:** both prompts name it explicitly for each condition and repeat it after the article. With only "same language and script as the article", gemma3:4b answered in the wrong language or script in 8 of 18 test summaries, often English. With the explicit language, 17 of 18 were correct.
+
+**Models:**
+- **Main run:** `gemma3:4b`, run locally through [Ollama](https://ollama.com) (`num_ctx=8192`, temperature 0, at most 300 output tokens). The longest article needs only about 800 prompt tokens. It takes about 7 s per summary on an 8 GB Mac.
+- **Large-model comparison:** `openai/gpt-oss-120b` via Groq on the first 50 articles. Groq's free-tier daily token limit makes a full run impractical.
+
+```bash
+ollama pull gemma3:4b
+python -m src.data.add_roman                                   # once
+python -m src.summarize --provider ollama --model gemma3:4b    # all articles
+python -m src.summarize --provider groq --model openai/gpt-oss-120b --limit 50
+```
+
+**Output:** `results/summaries_<model>.jsonl`, one line per summary. Fields: `id`, `condition`, `prompt_type`, `model`, `summary`, `latency_s`, `source_words`, `summary_words`, `compression_ratio` (summary words / source words).
+
+The script is resumable: combinations of `id`, `condition` and `prompt_type` that are already done are skipped, and each summary is appended to the file as soon as it is made.
 
 ---
 

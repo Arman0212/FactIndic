@@ -73,3 +73,30 @@ def test_rate_limit_retry_backoff():
                 assert mock_caller.call_count == 2
                 mock_sleep.assert_called_once_with(0.1)
 
+
+
+def test_ollama_generation_sends_options():
+    """generate(provider="ollama") must POST to the local Ollama API with
+    temperature 0, an 8192-token context and a 300-token output limit."""
+    fake_response = MagicMock()
+    fake_response.json.return_value = {"message": {"content": "  Mocked local summary  "}}
+    with patch("src.llm_client.requests.post", return_value=fake_response) as mock_post:
+        text, latency = generate("Sample prompt", provider="ollama", model="gemma3:4b")
+
+    assert text == "Mocked local summary"
+    assert isinstance(latency, float)
+    url = mock_post.call_args.args[0]
+    body = mock_post.call_args.kwargs["json"]
+    assert url.endswith("/api/chat")
+    assert body["model"] == "gemma3:4b"
+    assert body["stream"] is False
+    assert body["options"] == {"temperature": 0.0, "num_ctx": 8192, "num_predict": 300}
+
+
+def test_explicit_provider_uses_its_default_model():
+    """If .env says groq but we ask for ollama without a model, we must not
+    send the groq model name to Ollama."""
+    with patch.dict(os.environ, {"LLM_PROVIDER": "groq", "LLM_MODEL": "openai/gpt-oss-120b"}):
+        with patch("src.llm_client._call_ollama", return_value="ok") as mock_call:
+            generate("Sample prompt", provider="ollama")
+    assert mock_call.call_args.kwargs["model"] == "gemma3:4b"

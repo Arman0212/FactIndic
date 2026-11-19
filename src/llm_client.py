@@ -8,8 +8,8 @@ Viva Explanation Points:
 ------------------------
 1. Why an abstraction layer?
    - Decouples our NLP summarization and evaluation pipelines from the underlying
-     LLM provider. We can switch between Groq (open models like LLaMA) and Google
-     Gemini with a single environment variable change.
+     LLM provider. We can switch between Groq (open models like LLaMA), Google
+     Gemini and a local Ollama model with a single setting.
 2. Why temperature=0?
    - Abstractive summarization and factuality evaluation require reproducibility and
      deterministic outputs. A temperature of 0 minimizes sampling randomness.
@@ -22,10 +22,24 @@ Viva Explanation Points:
 import os
 import time
 from typing import Optional, Tuple
+
+import requests
 from dotenv import load_dotenv, find_dotenv
 
 # Load environment variables from .env (searches current directory and parents)
 load_dotenv(find_dotenv(usecwd=True))
+
+# Default model for each provider (used when no model is given explicitly)
+DEFAULT_MODELS = {
+    "gemini": "gemini-2.5-flash",
+    "groq": "llama-3.3-70b-versatile",
+    "ollama": "gemma3:4b",
+}
+
+# Ollama settings for local models
+OLLAMA_URL = os.getenv("OLLAMA_URL", "http://localhost:11434")
+OLLAMA_NUM_CTX = 8192      # context window in tokens: long Hindi articles must fit
+OLLAMA_MAX_TOKENS = 300    # max output tokens: plenty for a 2-3 sentence summary
 
 
 def _call_gemini(
@@ -105,6 +119,44 @@ def _call_groq(
     return content.strip() if content else ""
 
 
+def _call_ollama(
+    prompt: str,
+    system: Optional[str],
+    model: str,
+    temperature: float,
+) -> str:
+    """Internal helper to call a local model through Ollama's REST API.
+
+    Ollama runs on this machine, so there is no API key and no rate limit.
+    Its default context window (2048 tokens) is too small for a long Hindi
+    article (Devanagari needs many tokens per word), so we set num_ctx
+    explicitly; otherwise Ollama would silently cut off the start of the
+    prompt.
+    """
+    messages = []
+    if system:
+        messages.append({"role": "system", "content": system})
+    messages.append({"role": "user", "content": prompt})
+
+    response = requests.post(
+        f"{OLLAMA_URL}/api/chat",
+        json={
+            "model": model,
+            "messages": messages,
+            "stream": False,  # wait for the full answer instead of streaming tokens
+            "options": {
+                "temperature": temperature,
+                "num_ctx": OLLAMA_NUM_CTX,
+                "num_predict": OLLAMA_MAX_TOKENS,
+            },
+        },
+        timeout=600,  # a small laptop can take a while on long inputs
+    )
+    response.raise_for_status()
+    content = response.json()["message"]["content"]
+    return content.strip() if content else ""
+
+
 def _is_rate_limit_error(error: Exception) -> bool:
     """
     Check if an exception is related to rate limiting (HTTP 429 / Resource Exhausted).
@@ -136,6 +188,8 @@ def generate(
     temperature: float = 0.0,
     max_retries: int = 5,
     initial_delay: float = 2.0,
+    provider: Optional[str] = None,
+    model: Optional[str] = None,
 ) -> Tuple[str, float]:
     """
     Generate text from an LLM with automated rate-limit retries and latency tracking.
@@ -152,6 +206,11 @@ def generate(
         Maximum number of retry attempts upon encountering rate limit (429) errors.
     initial_delay : float, default=2.0
         Initial delay in seconds for exponential backoff.
+    provider : Optional[str]
+        "gemini", "groq" or "ollama". Defaults to LLM_PROVIDER from .env.
+    model : Optional[str]
+        Model name. Defaults to LLM_MODEL from .env if the provider is the
+        one configured there, otherwise to DEFAULT_MODELS[provider].
 
     Returns:
     --------
@@ -165,11 +224,16 @@ def generate(
     Exception:
         If all retries are exhausted or a non-rate-limit API error occurs.
     """
-    # 1. Read configuration from environment variables (.env)
-    provider = os.getenv("LLM_PROVIDER", "gemini").strip().lower()
+    # 1. Decide provider and model: explicit arguments win, then .env
+    env_provider = os.getenv("LLM_PROVIDER", "gemini").strip().lower()
+    provider = (provider or env_provider).strip().lower()
+    if not model:
+        if provider == env_provider and os.getenv("LLM_MODEL"):
+            model = os.getenv("LLM_MODEL").strip()
+        else:
+            model = DEFAULT_MODELS.get(provider, "")
 
     if provider == "gemini":
-        model = os.getenv("LLM_MODEL", "gemini-2.5-flash").strip()
         api_key = os.getenv("GEMINI_API_KEY", "").strip()
         if not api_key:
             raise ValueError(
@@ -184,7 +248,6 @@ def generate(
         )
 
     elif provider == "groq":
-        model = os.getenv("LLM_MODEL", "llama-3.3-70b-versatile").strip()
         api_key = os.getenv("GROQ_API_KEY", "").strip()
         if not api_key:
             raise ValueError(
@@ -198,9 +261,18 @@ def generate(
             api_key=api_key,
         )
 
+    elif provider == "ollama":
+        caller = lambda: _call_ollama(
+            prompt=prompt,
+            system=system,
+            model=model,
+            temperature=temperature,
+        )
+
     else:
         raise ValueError(
-            f"Unsupported LLM_PROVIDER: '{provider}'. Supported providers are 'gemini' and 'groq'."
+            f"Unsupported LLM_PROVIDER: '{provider}'. "
+            "Supported providers are 'gemini', 'groq' and 'ollama'."
         )
 
     # 2. Execute with exponential backoff on rate limits

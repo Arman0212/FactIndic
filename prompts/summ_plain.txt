@@ -1,0 +1,8 @@
+Summarize the following article in 2-3 sentences.
+Write the summary in {language}.
+Output only the summary.
+
+Article:
+{article}
+
+Now write the 2-3 sentence summary in {language}.

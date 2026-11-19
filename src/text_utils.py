@@ -12,11 +12,11 @@ import unicodedata
 
 # All dash / hyphen variants: U+2010..U+2015 (hyphen, non-breaking hyphen,
 # figure dash, en dash, em dash, horizontal bar) and U+2212 (minus sign).
-_DASHES = re.compile("[‐-―−]")
+_DASHES = re.compile("[\u2010-\u2015\u2212]")
 
 # Curly / angled double quotes -> "   and   curly single quotes / primes -> '
-_DOUBLE_QUOTES = re.compile("[“”„‟«»″]")
-_SINGLE_QUOTES = re.compile("[‘’‚‛′]")
+_DOUBLE_QUOTES = re.compile("[\u201c\u201d\u201e\u201f\u00ab\u00bb\u2033]")
+_SINGLE_QUOTES = re.compile("[\u2018\u2019\u201a\u201b\u2032]")
 
 # Any run of whitespace (spaces, tabs, newlines, non-breaking spaces ...)
 _WHITESPACE = re.compile(r"\s+")

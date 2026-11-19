@@ -1,0 +1,17 @@
+Summarize the following article in 2-3 sentences.
+
+Follow these rules strictly:
+1. Use only information that is stated in the article.
+2. Copy the names of people, places and organizations exactly as they are written in the article.
+3. Copy every number, date and amount exactly as it is written in the article.
+4. Do not add background knowledge, opinions or guesses.
+5. Do not translate English words in code-mixed text into Hindi, or Hindi words into English.
+6. If you are unsure about a fact, leave it out.
+7. Write the summary in {language}.
+
+Output only the summary.
+
+Article:
+{article}
+
+Now write the 2-3 sentence summary in {language}.
