@@ -171,7 +171,39 @@ python -m src.summarize --provider groq --model openai/gpt-oss-120b --limit 50
 
 **Output:** `results/summaries_<model>.jsonl`, one line per summary. Fields: `id`, `condition`, `prompt_type`, `model`, `summary`, `latency_s`, `source_words`, `summary_words`, `compression_ratio` (summary words / source words).
 
-The script is resumable: combinations of `id`, `condition` and `prompt_type` that are already done are skipped, and each summary is appended to the file as soon as it is made.
+The script is resumable: combinations of `id`, `condition` and `prompt_type` that are already done are skipped, and each summary is appended to the file as soon as it is made. If the API's rate limit is reached, the script stops cleanly; running the same command again resumes.
+
+**Language/script check** (`src/script_check.py`). Every saved summary gets three fields: `script_ok`, `deva_share` (Devanagari letters / all letters) and `en_ratio` (share of words tagged English by the CMI tagger).
+- `hi` summaries must be at least 80% Devanagari.
+- `hi_roman` and `hinglish` summaries must be at most 20% Devanagari and have `en_ratio` ≤ 0.6.
+- The 0.6 threshold is calibrated on our data. All Romanized and Hinglish source articles score at most 0.33, and English summaries score 0.74–0.96. The highest-scoring accepted summary is at 0.45.
+- Wrong-language summaries are **kept, not regenerated**. The wrong-language rate is reported as a finding, and these summaries are excluded from the factuality metrics.
+- To re-check a whole file: `python -m src.script_check results/summaries_<model>.jsonl`.
+
+### Results so far: gemma3:4b, all 186 articles (1,116 summaries)
+
+Wrong language or script:
+
+| Condition | Plain | Factual |
+|---|---|---|
+| `hi` | 0 / 186 (0.0%) | 0 / 186 (0.0%) |
+| `hi_roman` | 0 / 186 (0.0%) | 6 / 186 (3.2%) |
+| `hinglish` | 10 / 186 (5.4%) | 17 / 186 (9.1%) |
+
+- In total, 33 of 1,116 summaries (3.0%) are in the wrong language or script.
+- 27 are English summaries of Hinglish articles; 6 are Devanagari summaries of Romanized Hindi articles.
+- The factuality-aware prompt causes more language switching than the plain prompt.
+
+Mean summary length (summaries that passed the script check; compression = summary words / source words):
+
+| Condition | Plain | Factual |
+|---|---|---|
+| `hi` | 73.9 words (0.288) | 78.6 words (0.308) |
+| `hi_roman` | 80.9 words (0.315) | 84.7 words (0.327) |
+| `hinglish` | 83.3 words (0.322) | 87.5 words (0.344) |
+
+- The mean latency is 10.1 s per summary on an 8 GB Mac, for a total of 3.1 h.
+- The `openai/gpt-oss-120b` comparison (50 articles, `hi` + `hinglish` only) is **in progress**: 16 of 200 summaries so far, limited by Groq's daily token quota.
 
 ---
 

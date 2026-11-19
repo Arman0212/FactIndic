@@ -31,3 +31,14 @@ def test_romanize_hindi():
     # final silent 'a' dropped, anusvara -> n, nukta letters, danda -> "."
     assert romanize("विमान में ख़बर सज़ा।") == "viman men khabar saza."
     assert romanize("ऑफ़िस 9.15 बजे") == "ofis 9.15 baje"   # digits untouched
+
+
+def test_script_check():
+    from src.script_check import check_script
+    assert check_script("विमान लाहौर से मैनचेस्टर जा रहा था.", "hi")["script_ok"]
+    assert not check_script("viman Lahore se Manchester ja raha tha.", "hi")["script_ok"]
+    assert check_script("viman Lahore se Manchester ja raha tha.", "hi_roman")["script_ok"]
+    assert not check_script("विमान लाहौर से मैनचेस्टर जा रहा था.", "hinglish")["script_ok"]
+    english = "Police officers arrested two suspects after the plane was diverted to the airport."
+    assert not check_script(english, "hinglish")["script_ok"]
+    assert check_script("Police officers ne airport par do suspects ko arrest kiya.", "hinglish")["script_ok"]

@@ -12,26 +12,30 @@ hi -> hi_roman isolates the effect of the SCRIPT; hi_roman -> hinglish
 isolates the effect of CODE-MIXING; plain -> factual measures whether
 factuality-aware prompting helps.
 
-Each summary is saved as one JSON line in results/summaries_<model>.jsonl.
+Each summary is saved as one JSON line in results/summaries_<model>.jsonl,
+together with a language/script check (script_ok, see src/script_check.py).
 The script is resumable: (id, condition, prompt_type) combinations already in
 the file are skipped, and each summary is appended as soon as it is made.
 
 Examples:
     python -m src.summarize --provider ollama --model gemma3:4b --limit 3
     python -m src.summarize --provider ollama --model gemma3:4b          # all
-    python -m src.summarize --provider groq --model openai/gpt-oss-120b --limit 50
+    python -m src.summarize --provider groq --model openai/gpt-oss-120b --limit 50 \
+        --conditions hi hinglish
 """
 
 import argparse
 import json
 import re
+import sys
 from pathlib import Path
 
 from tqdm import tqdm
 
 from src.data.fix_flagged import FINAL_PATH
 from src.data.make_hinglish import read_jsonl
-from src.llm_client import generate
+from src.llm_client import _is_rate_limit_error, generate
+from src.script_check import check_script
 from src.text_utils import normalize
 
 RESULTS_DIR = Path("results")
@@ -78,6 +82,8 @@ def main():
     parser.add_argument("--provider", default="ollama", help="ollama, groq or gemini (default: ollama)")
     parser.add_argument("--model", default="gemma3:4b", help="model name (default: gemma3:4b)")
     parser.add_argument("--limit", type=int, default=None, help="only use the first N articles")
+    parser.add_argument("--conditions", nargs="+", choices=list(CONDITIONS), default=list(CONDITIONS),
+                        help="which input conditions to run (default: all three)")
     args = parser.parse_args()
 
     articles = read_jsonl(FINAL_PATH)
@@ -95,11 +101,11 @@ def main():
     jobs = [
         (art, cond, ptype)
         for art in articles
-        for cond in CONDITIONS
+        for cond in args.conditions
         for ptype in PROMPTS
         if (art["id"], cond, ptype) not in done
     ]
-    total = len(articles) * len(CONDITIONS) * len(PROMPTS)
+    total = len(articles) * len(args.conditions) * len(PROMPTS)
     print(f"Model {args.provider}/{args.model}: {total} summaries, "
           f"{total - len(jobs)} already done, {len(jobs)} to go -> {out_path}")
 
@@ -109,8 +115,16 @@ def main():
         prompt = templates[ptype].replace("{language}", LANGUAGES[cond])
         prompt = prompt.replace("{article}", source)
 
-        summary, latency = generate(prompt, temperature=0.0,
-                                    provider=args.provider, model=args.model)
+        try:
+            summary, latency = generate(prompt, temperature=0.0,
+                                        provider=args.provider, model=args.model)
+        except Exception as e:
+            if _is_rate_limit_error(e):
+                # e.g. Groq's daily token limit: stop cleanly; everything done
+                # so far is saved, and running the same command later resumes.
+                tqdm.write(f"Rate limit reached, stopping. Run the same command later to resume.\n{str(e)[:300]}")
+                sys.exit(0)
+            raise
         summary = normalize(summary)
 
         source_words = len(source.split())
@@ -125,6 +139,8 @@ def main():
             "source_words": source_words,
             "summary_words": summary_words,
             "compression_ratio": round(summary_words / source_words, 4),
+            # language/script check: adds script_ok, deva_share, en_ratio
+            **check_script(summary, cond),
         }
         # Append immediately so nothing is lost if the run stops
         with open(out_path, "a", encoding="utf-8") as f:

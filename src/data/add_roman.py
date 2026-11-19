@@ -30,7 +30,9 @@ from src.text_utils import normalize
 
 # A run of Devanagari letters/signs/digits (U+0900-U+097F), but NOT the danda
 # punctuation marks । and ॥ (U+0964, U+0965), which we handle separately.
-DEVANAGARI_WORD = re.compile(r"[ऀ-ॣ०-ॿ]+")
+DEVANAGARI_WORD = re.compile(
+    "[" + chr(0x0900) + "-" + chr(0x0963) + chr(0x0966) + "-" + chr(0x097F) + "]+"
+)
 
 # Consonants: क..ह (U+0915-U+0939) and the nukta letters क़..य़ (U+0958-U+095F).
 CONSONANTS = set(chr(c) for c in range(0x0915, 0x093A)) | set(chr(c) for c in range(0x0958, 0x0960))
