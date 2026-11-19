@@ -1,0 +1,30 @@
+You are rewriting a Hindi news article into Hinglish.
+
+Hinglish is Hindi written in Roman (English) letters and heavily mixed with English, the way urban Indians naturally write on social media and WhatsApp.
+- Use English for everyday nouns, verbs and adjectives that urban Indians normally say in English: plane, airport, police officers, Defence Ministry, government, election, report, share, announce, arrest, attack, injured, serious, company, fuel, customers, village, minister, decision, etc.
+- Keep Hindi grammar: Hindi word order, postpositions and auxiliary verbs stay Hindi (ne, ko, ka, ki, ke, se, mein, par, hai, tha, kiya, raha, gaya, diya, hoga).
+- Verbs are usually "English word + Hindi helper": announce kiya, arrest kiya gaya, share kiya, injured hua, launch karegi.
+
+Examples:
+Hindi: पुलिस अधिकारियों ने विमान से दो संदिग्ध लोगों को गिरफ़्तार किया है.
+Hinglish: Police officers ne plane se do suspects ko arrest kiya hai.
+
+Hindi: सरकार ने चुनाव से पहले किसानों के लिए नई योजना की घोषणा की.
+Hinglish: Government ne election se pehle farmers ke liye new scheme announce ki.
+
+Hindi: रक्षा मंत्रालय ने कहा है कि घटना कितनी गंभीर थी, यह अभी बताना संभव नहीं है.
+Hinglish: Defence Ministry ne kaha hai ki incident kitna serious tha, yeh abhi batana possible nahi hai.
+
+Hindi: कंपनी की रिपोर्ट के मुताबिक़ इस साल बिक्री में तीन प्रतिशत की बढ़ोतरी हुई है.
+Hinglish: Company ki report ke according is saal sales mein teen percent ka increase hua hai.
+
+STRICT RULES:
+1. Keep every person name, place, organization, number, date, amount and unit exactly. Write names in their usual English spelling.
+2. Number words stay words and digits stay digits. "एक लाख" -> "ek lakh" (never "1 lakh"); "तीन हज़ार" -> "teen hazaar" (never "3000"); "2014" stays "2014"; "9.15" stays "9.15". Never convert between number words and digits.
+3. Do not add, remove or summarize any information. Every fact in the original must appear in your rewrite, and nothing else.
+4. Keep the same number of sentences, in the same order.
+5. Use only Roman script. No Devanagari.
+6. Output only the rewritten text: no title, no notes, no explanation.
+
+Hindi article:
+{article}

@@ -1,0 +1,24 @@
+# Common romanized Hindi words that an English wordlist would mistake for
+# English (either real English homographs like "the", "is", "do", "to", "bar",
+# "teen", or Hindi words frequent enough on the web to get a high English
+# score, like "hai", "ka", "se"). Used by the CMI tagger in check_hinglish.py:
+# a token in this list is always tagged Hindi. One word per line.
+# postpositions / particles
+ka ki ke ko se mein me main par pe tak ne hi bhi to toh na ya aur or
+# pronouns / determiners
+is us in un ye yeh wo woh ve jo jis jin jinhe jise isi usi inhe unhe unhone inhone
+iske uske inke unke iska uska inka unka iski uski inki unki ise use
+mai mera meri mere hum ham hamara hamare hume humein tum aap apna apni apne
+koi kuch sab sabhi kai log logon
+# auxiliaries and common verbs
+hai hain ho hoga hogi honge hona hone hota hoti hote hua hui hue tha thi the thhe
+kar kare karo karna karne karke karta karti karte kiya kiye ki karein karenge karega karegi
+ja jaa jata jati jate jana jane gaya gayi gaye
+de do diya diye dena dene deta deti dete le lo liya liye lena lene leta leti
+raha rahi rahe sakta sakti sakte mil mila mili mile laga lagi lage
+bana bane bani mana mod mud muda dal pa pana
+# common words
+ab jab tab kab yahan wahan kahan kya kyun kaise yun aise jaise phir lekin magar agar
+saath sath baad pehle bahut kam zyada sirf abhi
+din raat saal salon mahine der baat bat bar rang foot pan pita char teen ek
+lakh hazaar crore sau karan beech bazaar jai desh ghar aaj kal

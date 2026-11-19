@@ -79,14 +79,29 @@ def _call_groq(
         messages.append({"role": "system", "content": system})
     messages.append({"role": "user", "content": prompt})
 
+    # Extra settings for reasoning models (e.g. openai/gpt-oss-120b): they
+    # "think" before answering and the thinking tokens count against the
+    # output limit. With the default limit the thinking can use up the whole
+    # budget and the answer is cut off, so we keep reasoning low and raise
+    # the limit.
+    extra = {}
+    if "gpt-oss" in model:
+        extra["reasoning_effort"] = "low"
+
     # Call the Groq chat completion endpoint
     response = client.chat.completions.create(
         model=model,
         messages=messages,
         temperature=temperature,
+        max_completion_tokens=8192,
+        **extra,
     )
 
-    content = response.choices[0].message.content
+    choice = response.choices[0]
+    # Never silently return a truncated answer.
+    if choice.finish_reason == "length":
+        raise RuntimeError("Output truncated (finish_reason=length): hit max_completion_tokens")
+    content = choice.message.content
     return content.strip() if content else ""
 
 

@@ -93,6 +93,44 @@ Expected output:
 
 ---
 
+## 📊 Dataset
+
+**Final file:** `data/processed/factindic.jsonl`: **186 Hindi-Hinglish pairs**. Fields: `id`, `title`, `text_hi`, `text_hinglish`, `ref_summary_hi`, `cmi`.
+
+1. **Source.** The Hindi test split of [XL-Sum](https://huggingface.co/datasets/csebuetnlp/xlsum) (BBC Hindi articles with one-sentence reference summaries; 8,847 articles). It is loaded from the Hugging Face parquet branch because newer `datasets` versions no longer run the XL-Sum loading script.
+2. **Filtering.** We kept articles of 150-500 words (5,610 articles) and sampled 300 with seed 42 (`data/raw/hindi_300.jsonl`). All text is cleaned with `src/text_utils.normalize()`: Unicode NFC, all dash variants become `-`, quotes are unified, and whitespace is collapsed.
+3. **Hinglish generation.** Each article was rewritten into Roman-script Hinglish by `openai/gpt-oss-120b` (Groq) at temperature 0, using the prompt `prompts/to_hinglish.txt`. The prompt does three things:
+   - It asks for Hindi grammar, with the everyday nouns, verbs and adjectives that urban speakers say in English (4 few-shot examples).
+   - It requires every name, number, date and unit to stay the same, with number words kept as words and digits kept as digits.
+   - It forbids adding, removing or summarizing anything, and requires the same sentences in the same order.
+4. **Size.** Groq's free tier allows 200k tokens per day (about 50 articles), so generation stopped after the first 189 of the 300. The sample order is random, so these 189 are still a random sample.
+5. **Automatic quality check** (`src/data/check_hinglish.py`):
+   - **Numbers:** all numbers are extracted from both versions (Devanagari digits converted to ASCII, thousands separators dropped) and compared as multisets. The check flags any number that is missing or added.
+   - **Length:** the ratio of Hinglish words to Hindi words must be between 0.7 and 1.5.
+   - **Results:** 180 of 189 pairs passed. All 9 flagged pairs had added numbers, where the model turned a number word into digits (for example "थ्री डी" became "3D").
+   - **Retry:** each flagged pair was re-generated once, with the checker's complaint added to the prompt. 6 were fixed and 3 were dropped (`data/processed/dropped.csv`).
+6. **Code-mixing.** We measure the Code-Mixing Index (CMI, Das & Gambäck 2014): CMI = 100 × (1 − max(n_en, n_hi) / (n_en + n_hi)). It runs from 0 (one language only) to 50 (half and half).
+   - Each word is tagged as follows:
+     - A capitalized word in the middle of a sentence is treated as a named entity and ignored.
+     - A word on a list of romanized Hindi words (`data/lexicons/romanized_hindi_words.txt`) is Hindi.
+     - A word with an English Zipf frequency of at least 3 in `wordfreq` is English.
+     - Anything else is Hindi.
+   - **Mean CMI is 17.55** (median 17.04). On a 5-article pilot, the few-shot prompt raised mean CMI from 6.2 to 13.4 compared with a first prompt that had no few-shot examples.
+   - On average the Hinglish version has 1.005× as many words as the Hindi, for a mean of 276 Hindi words per article.
+7. **Manual check.** `data/processed/sample_for_manual_check.md` shows 30 random pairs, matched sentence by sentence. In 18 of the 186 pairs the naive sentence splitter finds a different number of sentences in the two versions (often a quotation split differently). These pairs are worth checking by hand.
+
+To rebuild the dataset, run these in order:
+
+```bash
+python -m src.data.load_xlsum        # 300 Hindi articles
+python -m src.data.make_hinglish     # Hinglish generation (resumable)
+python -m src.data.check_hinglish    # flags -> data/processed/flagged.csv
+python -m src.data.fix_flagged       # retry once, drop failures -> factindic.jsonl
+python -m src.data.make_manual_sample
+```
+
+---
+
 ## 📂 Project Structure
 
 ```
