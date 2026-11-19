@@ -42,6 +42,11 @@ results/*.csv
 results/*.json
 results/*.parquet
 !results/.gitkeep
+# ...but keep the small Phase 4 tables the README relies on
+!results/scores_*.csv
+!results/summary_table_*.csv
+!results/manual_annotation.csv
+!results/entity_threshold_tuning.csv
 
 # NLP model cache & Hugging Face downloads
 stanza_resources/

@@ -12,6 +12,9 @@ tqdm>=4.66.0
 wordfreq>=3.0
 indic-transliteration>=2.3.0
 requests>=2.31.0
+rapidfuzz>=3.0.0
+scipy>=1.11.0
+sentencepiece>=0.2.0
 
 # NLP, Model Evaluation & Metrics
 transformers>=4.40.0

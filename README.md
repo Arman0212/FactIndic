@@ -207,6 +207,78 @@ Mean summary length (summaries that passed the script check; compression = summa
 
 ---
 
+## 🔍 Evaluation (Phase 4)
+
+Everything runs locally (CPU/Apple MPS); no API calls. Only summaries that passed the language/script check are scored: **1,083 of 1,116** gemma3:4b summaries.
+
+```bash
+python -m src.evaluate --model gemma3:4b            # resumable; ~30 min on an 8 GB Mac
+python -m src.eval.make_annotation_set              # 60 summaries for hand labelling (never overwritten)
+python -m src.eval.agreement                        # after hand labelling: metrics vs human labels
+python -c "from src.eval.entities import tune_threshold; tune_threshold()"
+```
+
+**Outputs**
+- `results/scores_<model>.csv`: one row per summary.
+- `results/summary_table_<model>.csv`: mean and 95% bootstrap CI (1,000 resamples) per condition × prompt.
+- `results/cache/gold_entities.json`: cached Stanza NER output.
+
+### Metrics
+
+| Metric | File | What it measures |
+|---|---|---|
+| Number P/R/F1 | `src/eval/numbers.py` | Numbers from digits ("1,200", "9.15", Devanagari digits) and number words (teen hazaar / तीन हज़ार → 3000, ek lakh, डेढ़ करोड़). Values are compared as sets. Precision < 1 means a hallucinated or altered number. |
+| Entity P/R/F1 | `src/eval/entities.py` | Names matched across scripts with a phonetic skeleton (see below). |
+| NLI | `src/eval/nli.py` | Each summary sentence is scored by mDeBERTa-v3 XNLI; we take its max entailment over source premises (SummaC-style), then the mean over sentences, and count sentences with entailment < 0.5. |
+| ROUGE-1/2/L | `src/eval/overlap.py` | Overlap with the source, and with the reference summary (`hi` only, because the reference is Devanagari). Uses a whitespace tokenizer that keeps Devanagari words intact. |
+| BERTScore | `src/eval/overlap.py` | mBERT similarity between summary and source. mBERT reads at most 512 tokens, so only the start of long sources is used. |
+
+**How the entity metric works**
+- **Skeleton:** each word is romanized with the same ITRANS rules as `add_roman.py`, similar sounds are merged (ph/f, sh/s, w/v, z/j, aspiration dropped), and later vowels are removed. So "Stansted", स्टैनस्टेड and "stainasted" all become `stnstd`.
+- **Gold entities:** Stanza Hindi NER on `text_hi`.
+- **Recall:** counted only over the gold entities that can be found in that condition's source text, because the Hinglish rewrite sometimes translates names (रक्षा मंत्रालय → "Defence Ministry").
+- **Precision:** for Devanagari summaries, the candidates are Stanza entities; for Roman summaries, runs of capitalized words. A candidate is unsupported if it doesn't match anywhere in the source.
+
+**Entity threshold: 85** (`rapidfuzz.partial_ratio` on skeletons).
+- **How it was tuned:** on 20 (gold entity, summary) pairs from real summaries, sampled 4 per score band (55–70, 70–80, 80–88, 88–95, 95–100). Each pair was labelled by hand ("is this entity mentioned in the summary?"); the labels and notes are in `results/entity_threshold_tuning.csv`.
+- **Result:** a threshold of 85 classifies 19 of 20 correctly (80: 17/20; 90: 13/20). The one error is a Stanza span that merges a person's name with other words.
+- **Caveat:** the margin is narrow. The highest-scoring absent entity is at 83.3 and the lowest-scoring present one at 85.7.
+
+### Results: gemma3:4b (means; CIs in the CSV)
+
+| Condition | Prompt | n | Num P | Num R | Ent P | Ent R | NLI chunk | NLI window | ROUGE-2 src | BERTScore |
+|---|---|---|---|---|---|---|---|---|---|---|
+| hi | plain | 186 | 0.979 | 0.230 | 0.974 | 0.475 | 0.742 | 0.745 | 0.141 | 0.749 |
+| hi | factual | 186 | 0.970 | 0.557 | 0.994 | 0.661 | 0.613 | 0.727 | 0.259 | 0.787 |
+| hi_roman | plain | 186 | 0.999 | 0.391 | 0.995 | 0.553 | 0.475 | 0.713 | 0.388 | 0.788 |
+| hi_roman | factual | 180 | 1.000 | 0.513 | 1.000 | 0.624 | 0.454 | 0.708 | 0.440 | 0.792 |
+| hinglish | plain | 176 | 0.979 | 0.351 | 0.979 | 0.534 | 0.511 | 0.632 | 0.248 | 0.746 |
+| hinglish | factual | 169 | 1.000 | 0.523 | 0.997 | 0.675 | 0.397 | 0.647 | 0.419 | 0.786 |
+
+**Main observations**
+- **Precision is at the ceiling.** Number and entity precision is at least 0.97 in every cell: gemma3:4b rarely invents numbers or names. The cases we found by hand are a rounded number ("char lakh" for 4 lakh 40 hazaar) and an added first name ("जेम्स एंडरसन" where the source has only "एंडरसन").
+- **The factual prompt mainly raises recall.** Number recall rises from 0.23 to 0.56 for `hi`, from 0.35 to 0.52 for `hinglish`, and from 0.39 to 0.51 for `hi_roman`. Entity recall rises in the same way. The factual prompt also makes summaries more extractive: ROUGE-2 against the source goes from 0.14 to 0.26 for `hi`.
+- **The two NLI variants disagree about the prompt effect.**
+  - With large chunks, the factual prompt scores *lower* than the plain prompt in every condition (`hi`: 0.74 → 0.61).
+  - With 2-sentence windows, the two prompts score about the same.
+  - One possible explanation (not tested) is that factual summaries pack more facts into each sentence, which long-premise NLI penalizes.
+  - The primary NLI variant will be chosen by agreement with the manual labels (`src/eval/agreement.py`, point-biserial r and AUC against faithful-vs-error labels).
+
+### Limitations: read before comparing numbers
+
+- **NLI scores are only comparable *within* a condition (plain vs. factual), not *across* conditions.**
+  - The NLI model was trained on NLI data where Hindi appears in Devanagari. Romanized Hindi (`hi_roman`) is out of distribution, and code-mixed Hinglish mostly is too. Lower NLI scores for those conditions partly measure the model's unfamiliarity with the script, not hallucination.
+  - **Cross-condition comparisons (Hindi vs. Romanized vs. Hinglish) should rely on the number and entity metrics.** Both work on the phonetic skeleton and the number value, so they don't depend on the script.
+- **Relation errors are not caught by any automatic metric.** When a summary uses the right entities and numbers in the wrong relation, every metric passes it. Example: the Dreamliner `hi` / `plain` summary says Boeing launched *the Dreamliner* in 1995, when the source says 1995 was the launch of the *Boeing-777*. That sentence gets number precision 1.0, entity precision 1.0 and NLI 0.86. This is why we hand-label 60 summaries (`results/manual_annotation.csv`: faithful / minor_error / major_error plus the error type).
+- **`hi_roman` entity precision is optimistic (1.000).** Romanized Hindi summaries are all lowercase, so the only candidates are gold entities found in the summary; a hallucinated lowercase name can't be detected.
+- **Other approximations:**
+  - Stanza sometimes merges or misses entities. A merged multi-word entity counts as supported if each of its words is found in the source, so a mix-up of two real names isn't detected.
+  - The number parser ignores a lone "ek"/"एक" (usually the article "a"), and it reads the surname "Das" as 10.
+  - Rounding ("दो लाख से अधिक" for 2 lakh 30 hazaar) counts as an altered number.
+  - ROUGE F1 against the source is low in absolute terms because the source is much longer than the summary; compare conditions, not absolute values.
+
+---
+
 ## 📂 Project Structure
 
 ```
