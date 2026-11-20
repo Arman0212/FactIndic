@@ -1,0 +1,19 @@
+\section{Experimental Setup}
+\label{sec:setup}
+
+\paragraph{Generation}
+gemma3:4b runs locally through Ollama (v0.40.4) on an Apple M3 laptop with 8\,GB of memory, with temperature 0, a context window of 8,192 tokens (the longest prompt needs about 800) and at most 300 output tokens. gpt-oss-120b is called through the Groq API at temperature 0 with low reasoning effort; a response cut off by the token limit is treated as an error. Each prompt is sent once; wrong-language outputs are \emph{not} regenerated, so that the wrong-language rate can be reported.
+
+\paragraph{Evaluation}
+All metrics run locally on the same laptop (Apple MPS/CPU) without API calls, using Stanza 1.15, Transformers 5.23, PyTorch 2.15, bert-score 0.3.13 and rouge-score 0.1.2. Means are reported with 95\% percentile-bootstrap confidence intervals (1,000 resamples, seed 42). Model comparisons use only the (article, condition, prompt) combinations for which \emph{both} models produced a summary in the right language (188 of 200), so that both are scored on identical inputs.
+
+\paragraph{Human annotation}
+\todo{Annotator background (five students, native or fluent Hindi speakers, all read Hinglish); time per item; tool: one offline HTML page per annotator showing source and summary side by side with names and numbers highlighted.} Annotators A2--A5 saw only the source and summary. Annotator A1 used a version that could also show LLM-generated suggestion labels; these were hidden until A1 had chosen a label (blind mode), and for every A1 label we record whether it matches the suggestion and whether the suggestion was visible. \todo{report these counts.}
+
+\paragraph{Threats to validity}
+\begin{itemize}
+  \item \emph{Synthetic Hinglish.} The Hinglish articles are LLM rewrites, not naturally occurring Hinglish. Their CMI (mean 17.6) shows real mixing, but the style may be more regular than social-media text.
+  \item \emph{Generator overlap.} gpt-oss-120b both wrote the Hinglish articles and is one of the two summarizers, which may favour it on \cond{hinglish}.
+  \item \emph{Metric coverage across scripts.} The NLI model was trained with Hindi in Devanagari; Romanized and code-mixed inputs are partly out of distribution, so NLI scores are compared only \emph{within} a condition (plain vs.\ factual, or between models), never across conditions. Cross-condition comparisons rely on the script-independent number and entity metrics.
+  \item \emph{Size.} 186 articles and a 50-article model comparison give wide confidence intervals for small differences, and 60 labelled summaries limit the power of the metric--human agreement analysis.
+\end{itemize}

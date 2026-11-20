@@ -1,0 +1,24 @@
+\section{Introduction}
+
+Abstractive summaries written by neural models often contain statements that the source does not support~\cite{maynez2020faithfulness,ji2023survey}. For news, these \emph{factual inconsistencies} matter more than fluency: a summary that names the wrong winner of a match or reverses who condemned whom is worse than no summary. Large language models (LLMs) now produce fluent summaries in many languages without task-specific training, but most evidence about their faithfulness, and most of the metrics used to measure it, comes from English~\cite{pagnoni2021frank,honovich2022true}.
+
+Hindi is spoken by several hundred million people, and online it is often not written in its native Devanagari script at all. Much everyday writing is \emph{Hinglish}: Hindi grammar in Roman letters, mixed with English words. A summarizer deployed for Indian users will therefore meet three kinds of input for the same content: Devanagari Hindi, Romanized Hindi, and code-mixed Hinglish. Each of them stresses a model differently, and each stresses the \emph{evaluation} differently: named-entity recognizers, NLI models and lexical metrics are typically built for one script and one language at a time.
+
+This paper asks three questions:
+\begin{enumerate}
+  \item Does the \emph{form} of the input (script, code-mixing) change how faithful LLM summaries are?
+  \item Does a factuality-aware prompt, which tells the model to copy names and numbers exactly and add nothing, make summaries more faithful than a plain prompt?
+  \item Which automatic metrics can be trusted for this setting, and what do they miss?
+\end{enumerate}
+
+To separate the effect of the script from the effect of code-mixing, we build a \emph{parallel} dataset. For each of 186 Hindi news articles from XL-Sum~\cite{hasan2021xlsum} we have the original Devanagari text (\cond{hi}), a deterministic Romanized transliteration that changes only the script (\cond{hi-rom}), and an LLM rewrite into Hinglish that keeps every name, number and sentence (\cond{hinglish}). Because the facts are identical across the three versions, differences in the summaries can be attributed to the input form.
+
+We make the following contributions:
+\begin{itemize}
+  \item A parallel Hindi / Romanized Hindi / Hinglish dataset of 186 news articles with automatic fact-preservation checks and a measured Code-Mixing Index~\cite{das2014identifying}.
+  \item A training-free evaluation pipeline that works across scripts: number matching on parsed values (including Hindi number words such as \emph{teen hazaar} or \emph{dedh crore}), entity matching on a phonetic skeleton that makes Devanagari and Roman spellings comparable, and SummaC-style NLI~\cite{laban2022summac} with two premise granularities.
+  \item A controlled comparison of a plain and a factuality-aware prompt for a small local model (gemma3:4b, 1,116 summaries), and a comparison with a 120B model on a 50-article subset, including how often each model answers in the wrong language or script.
+  \item A five-annotator human evaluation of 60 summaries with an error typology, used to test which automatic metrics agree with human judgments. \todo{one sentence on the human-label result.}
+\end{itemize}
+
+All code, prompts, model outputs and scores are released.\todo{repository URL}

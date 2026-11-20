@@ -1,0 +1,37 @@
+\section{Method}
+\label{sec:method}
+
+\subsection{Prompts}
+We compare two zero-shot prompts, each applied to all three conditions:
+\begin{itemize}
+  \item \textbf{Plain}: ``Summarize the following article in 2--3 sentences.''
+  \item \textbf{Factual}: the same instruction plus six rules: use only information stated in the article; copy names of people, places and organizations exactly; copy every number, date and amount exactly; add no background knowledge, opinions or guesses; do not translate between English and Hindi in code-mixed text; leave out any fact you are unsure about.
+\end{itemize}
+Both prompts name the required output language explicitly (Hindi in Devanagari script, Hindi in Roman script, or Hinglish in Roman script) before and after the article. In a pilot, the generic instruction ``use the same language and script as the article'' produced the wrong language in 8 of 18 summaries, mostly English; with an explicit language, 17 of 18 were correct.
+
+\subsection{Models}
+The main model is \textbf{gemma3:4b}~\cite{gemma2025gemma3}, a 4-billion-parameter open model that runs on a laptop. It summarizes every article in every condition with both prompts (186 $\times$ 3 $\times$ 2 = 1,116 summaries). As a large-model reference we use \textbf{gpt-oss-120b}~\cite{openai2025gptoss} on the first 50 articles of the (random) sample, for \cond{hi} and \cond{hinglish} with both prompts (200 summaries). No model is trained or fine-tuned.
+
+\subsection{Language/script check}
+A summary in the wrong language cannot be compared with its source by lexical or entity metrics, so every summary is first checked automatically. \cond{hi} summaries must be at least 80\% Devanagari letters. \cond{hi-rom} and \cond{hinglish} summaries must be at most 20\% Devanagari, and at most 60\% of their words may be tagged English by the CMI tagger. The 0.6 threshold separates our data cleanly: all Romanized and Hinglish \emph{source} articles score at most 0.33 and English summaries score 0.74--0.96. Wrong-language summaries are kept and reported as a result, but excluded from the factuality metrics.
+
+\subsection{Factual consistency metrics}
+
+\paragraph{Numbers}
+We extract numbers from digits (including Devanagari digits and thousands separators) and from number words in both scripts, after transliterating to Roman, e.g.\ \emph{teen hazaar} $\to$ 3000, \emph{dedh crore} $\to 1.5\times10^7$, \emph{700 arab} $\to 7\times10^{11}$. With $N_s$ and $N_d$ the sets of values in the summary and the source document,
+\begin{equation}
+P_{num} = \frac{|N_s \cap N_d|}{|N_s|}, \qquad R_{num} = \frac{|N_s \cap N_d|}{|N_d|}.
+\end{equation}
+$P_{num} < 1$ signals an invented or altered number; $R_{num}$ measures how many of the source's numbers are kept. $P_{num}$ is undefined for summaries without numbers and is then left out of the averages.
+
+\paragraph{Entities}
+Gold entities are obtained with Stanza~\cite{qi2020stanza} Hindi NER on the Devanagari article. To match names across scripts we map every word to a \emph{phonetic skeleton}: it is transliterated to Roman, similar sounds are merged (ph/f, sh/s, w/v, z/j, aspiration dropped), and non-initial vowels are removed, so that ``Stansted'', its Devanagari spelling and the transliteration ``stainasted'' all become \texttt{stnstd}. Two skeletons match if their \texttt{rapidfuzz} partial ratio is at least 85. This threshold was set on 20 hand-labelled (entity, summary) pairs sampled across score bands, where it classifies 19 of 20 correctly (80: 17/20; 90: 13/20). Entity recall counts the gold entities found in the summary, over those gold entities that can be found in that condition's source (the Hinglish rewrite occasionally translates an organization name). Entity precision checks summary entities against the source: Stanza entities for Devanagari summaries, runs of capitalized words for Roman-script summaries.
+
+\paragraph{NLI}
+Following SummaC-ZS~\cite{laban2022summac}, each summary sentence $s$ is scored by an NLI model against premises $p$ drawn from the source, and receives $\max_p P(\textit{entail}\mid p, s)$; the summary score is the mean over its sentences, and sentences scoring below 0.5 are counted as unsupported. We use mDeBERTa-v3-base~\cite{he2023debertav3} fine-tuned on multilingual NLI data~\cite{laurer2024less}. Because the right premise size is unclear for this model and these inputs, we compute two variants: \emph{chunk}, in which the premises are whole source sentences packed into chunks of at most 400 tokens, and \emph{window}, in which they are all windows of two consecutive source sentences.
+
+\paragraph{Overlap and similarity}
+ROUGE-1/2/L~\cite{lin2004rouge} F1 is computed against the source (and, for \cond{hi}, against the Devanagari reference summary) with a whitespace tokenizer that keeps Devanagari words intact. BERTScore~\cite{zhang2020bertscore} F1 between summary and source uses multilingual BERT~\cite{devlin2019bert} (layer 9).
+
+\subsection{Human evaluation}
+Sixty gemma3:4b summaries (10 per condition $\times$ prompt, sampled at random) are labelled by five annotators as \emph{faithful}, \emph{minor error} (a detail is wrong, the main message holds) or \emph{major error} (the main point is wrong), with one of six error types: entity, number, added information, meaning (correct names and numbers in a wrong relation, including negation), omission that makes the summary misleading, or other. The guidelines instruct annotators to judge only by the article, not by world knowledge. Ten summaries are labelled by all five annotators to measure agreement (Fleiss' $\kappa$~\cite{fleiss1971measuring} and pairwise Cohen's $\kappa$~\cite{cohen1960coefficient}); the remaining 50 are split ten per annotator, stratified by condition and prompt. Shared items take the majority label, with ties resolved towards the more severe label. We then compare each automatic metric with the binary human judgment (faithful vs.\ any error) by point-biserial correlation and AUC.

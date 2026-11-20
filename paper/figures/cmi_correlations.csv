@@ -1,0 +1,9 @@
+condition,prompt_type,metric,n,spearman_rho,p
+hinglish,plain,num_r,158,0.1749,0.028
+hi (control),plain,num_r,167,0.0939,0.2273
+hinglish,factual,num_r,153,0.1799,0.026
+hi (control),factual,num_r,167,0.1309,0.0916
+hinglish,plain,ent_r,170,-0.017,0.8256
+hi (control),plain,ent_r,181,0.063,0.3993
+hinglish,factual,ent_r,164,0.046,0.5585
+hi (control),factual,ent_r,181,-0.0002,0.998

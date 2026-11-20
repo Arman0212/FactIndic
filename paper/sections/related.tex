@@ -1,0 +1,16 @@
+\section{Related Work}
+
+\subsection{Summarization for Indian languages}
+XL-Sum~\cite{hasan2021xlsum} collects professionally written BBC article--summary pairs in 44 languages, including Hindi, and reports fine-tuned mT5~\cite{xue2021mt5} baselines. The IndicNLG benchmark~\cite{kumar2022indicnlg} adds summarization and other generation tasks for eleven Indic languages. Both benchmarks evaluate mainly with ROUGE~\cite{lin2004rouge}, which rewards overlap with a reference but does not check whether a summary is supported by its source. mFACE~\cite{aharoni2023mface} is among the few studies of factual consistency in multilingual summarization; it uses an NLI-based consistency model to filter and control training data across XL-Sum languages. We study prompted LLMs rather than fine-tuned models, and add script and code-mixing as controlled factors.
+
+\subsection{Code-mixing}
+Code-mixed Hindi-English is common on Indian social media and is challenging for standard NLP pipelines. GLUECoS~\cite{khanuja2020gluecos} collects code-switched benchmarks, including Hindi-English tasks, and shows that models trained on monolingual data degrade on them. The amount of mixing in a text is usually quantified with the Code-Mixing Index (CMI)~\cite{das2014identifying,gamback2016comparing}, which is 0 for monolingual text and rises towards 50 as the two languages are used equally. Summarization of code-mixed text has been studied mainly for conversations: GupShup~\cite{mehnaz2021gupshup} provides Hinglish dialogue--summary pairs. To our knowledge, factual consistency of summaries of code-mixed \emph{news} has not been measured, nor has the effect of script alone been separated from the effect of code-mixing.
+
+\subsection{Factual consistency evaluation}
+Maynez et al.~\cite{maynez2020faithfulness} showed that a large share of abstractive summaries contain hallucinated content, and FRANK~\cite{pagnoni2021frank} proposed a typology of factual errors (e.g.\ entity, predicate and circumstance errors) together with human judgments to benchmark metrics. Existing metrics fall into several families:
+\begin{itemize}
+  \item \emph{Entailment classifiers.} FactCC~\cite{kryscinski2020factcc} trains a classifier on synthetically corrupted summary sentences. SummaC~\cite{laban2022summac} instead applies an off-the-shelf NLI model at the sentence level and aggregates the scores, overcoming the mismatch between document-length premises and sentence-level NLI training data.
+  \item \emph{Question answering.} QAGS~\cite{wang2020qags} and QAFactEval~\cite{fabbri2022qafacteval} generate questions from the summary and compare the answers obtained from the summary and from the source.
+  \item \emph{Entity-level checks.} Nan et al.~\cite{nan2021entity} measure the precision of named entities in the summary with respect to the source, a simple and interpretable signal of entity hallucination.
+\end{itemize}
+The TRUE benchmark~\cite{honovich2022true} found NLI- and QA-based metrics to be the strongest on English data. QA-based metrics need question generation and answering models, which are not readily available for Romanized or code-mixed Hindi, so we rely on a multilingual NLI model trained on XNLI-style data~\cite{conneau2018xnli,laurer2024less} and on script-independent entity and number checks in the spirit of Nan et al.

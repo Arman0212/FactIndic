@@ -1,0 +1,20 @@
+\section{Error Analysis}
+\label{sec:errors}
+
+% OUTLINE - depends on the merged human labels (results/manual_annotation.csv).
+
+\todo{Write this section after the human labels are merged.}
+
+\begin{itemize}
+  \item \todo{Distribution of error types (entity / number / added\_info / meaning / omission / other) per condition and prompt.}
+  \item \textbf{Relation (``meaning'') errors that every automatic metric passes.} Candidate examples already found while building the pipeline (confirm with the final labels):
+  \begin{itemize}
+    \item Dreamliner (\cond{hi}, plain): the summary dates the launch of the Dreamliner to 1995, whereas the source gives 1995 as the launch of the Boeing 777. Number precision 1.0, entity precision 1.0, NLI 0.86.
+    \item Paes: the summary turns his 20th US Open \emph{appearance} into a 20th \emph{title}.
+    \item \todo{2--3 more examples from the labelled set, e.g.\ role reversals (who condemned whom), outcome reversals (abandoned match reported as a win).}
+  \end{itemize}
+  \item \textbf{Number errors}: rounding (``over 2 lakh'' for 2 lakh 30 thousand), number words vs.\ digits. \todo{counts.}
+  \item \textbf{Entity errors}: added first names (a surname-only source name expanded), transliteration variants. \todo{counts.}
+  \item \textbf{Code-mixing artifacts}: translation of English words in Hinglish summaries; switch to English. \todo{examples.}
+  \item \textbf{Metric failure cases}: summaries the metrics flag but humans judge faithful (e.g.\ number parser reading the surname ``Das'' as 10). \todo{from agreement analysis.}
+\end{itemize}

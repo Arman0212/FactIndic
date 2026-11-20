@@ -1,0 +1,37 @@
+\section{Dataset}
+\label{sec:dataset}
+
+\subsection{Source articles}
+We start from the Hindi test split of XL-Sum~\cite{hasan2021xlsum} (8,847 BBC Hindi articles, each with a one-sentence reference summary). We keep articles of 150--500 words (5,610 articles) so that every article fits the context of a small model, and draw a random sample of 300 (seed 42). All text is normalized (Unicode NFC, unified dashes and quotation marks, collapsed whitespace).
+
+\subsection{Three parallel conditions}
+Each article is presented in three forms that share the same facts:
+\begin{itemize}
+  \item \cond{hi}: the original Devanagari text.
+  \item \cond{hi-rom}: a rule-based Romanized transliteration of the same Hindi words (ITRANS scheme, lowercased, with deletion of the word-final inherent vowel and normalization of nukta letters). No LLM is involved, so only the \emph{script} changes.
+  \item \cond{hinglish}: a rewrite into Roman-script Hinglish by gpt-oss-120b~\cite{openai2025gptoss} at temperature 0. The prompt (with four few-shot examples) asks for Hindi grammar with the everyday nouns, verbs and adjectives that urban speakers say in English, requires every name, number, date and unit to stay unchanged, and forbids adding, removing or summarizing content. Relative to \cond{hi-rom}, this adds \emph{code-mixing}.
+\end{itemize}
+
+\subsection{Quality control}
+Every Hindi--Hinglish pair is checked automatically. All numbers (Devanagari and ASCII digits) are extracted from both versions and compared as multisets, and the Hinglish/Hindi word-count ratio must lie between 0.7 and 1.5. Of the first 189 generated pairs, 180 passed; all nine failures came from number words turned into digits (e.g.\ ``three-D'' written as ``3D''). Each failing pair was regenerated once with the checker's complaint added to the prompt; six were fixed and three were dropped. Generation stopped after 189 articles because of the provider's daily token limit; since the sample order is random, the resulting 186 articles remain a random sample.
+
+\subsection{Code-mixing}
+We measure the Code-Mixing Index~\cite{das2014identifying}, $\mathrm{CMI} = 100\,(1 - \max(n_{en}, n_{hi}) / (n_{en} + n_{hi}))$, where $n_{en}$ and $n_{hi}$ count English and Hindi tokens. Tokens are tagged by rule: capitalized words inside a sentence are treated as named entities and ignored; words in a list of common Romanized Hindi words are Hindi; words with an English Zipf frequency $\geq 3$ in \texttt{wordfreq} are English; everything else is Hindi. In a five-article pilot, few-shot examples raised the mean CMI of the rewrites from 6.2 to 13.4. Table~\ref{tab:dataset} summarizes the final dataset.
+
+\begin{table}[t]
+\centering
+\caption{The FactIndic dataset (186 parallel articles).}
+\label{tab:dataset}
+\begin{tabular}{@{}lr@{}}
+\toprule
+Articles (XL-Sum Hindi test, 150--500 words) & 186 \\
+Words per article, \cond{hi} (mean $\pm$ sd) & 275.7 $\pm$ 82.1 \\
+Words per article, \cond{hinglish} (mean $\pm$ sd) & 276.8 $\pm$ 82.2 \\
+Words per reference summary (mean) & 26.8 \\
+CMI, \cond{hinglish} (mean/median/range) & 17.6/17.0/1.4--33.3 \\
+Named entities per article (Stanza, mean) & 8.7 \\
+Distinct numbers per article (mean) & 3.9 \\
+Articles without any number & 19 \\
+\bottomrule
+\end{tabular}
+\end{table}

@@ -1,0 +1,52 @@
+% FactIndic - IEEE conference paper (IEEEtran, 2-column).
+% Build:  cd paper && tectonic main.tex        (or: latexmk -pdf main.tex)
+% Word:   cd paper && pandoc main.tex --citeproc --bibliography=references.bib -o FactIndic.docx
+% Sections live in sections/*.tex; figures are made by
+%   python -m src.analysis.make_figures   (writes paper/figures/*.pdf|png)
+\documentclass[conference]{IEEEtran}
+\IEEEoverridecommandlockouts
+
+\usepackage{cite}
+\usepackage{amsmath}
+\usepackage{newtxtext,newtxmath}  % Times, as in IEEE proceedings
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{multirow}
+\usepackage{xcolor}
+\usepackage{url}
+\usepackage[hidelinks]{hyperref}
+
+\graphicspath{{figures/}}
+
+% Visible markers for unfinished parts. Search for "TODO" before submission.
+\newcommand{\todo}[1]{\textcolor{red}{\textbf{[TODO:} #1\textbf{]}}}
+\newcommand{\cond}[1]{\textsc{#1}}   % condition names: \cond{hi}, \cond{hi-rom}, \cond{hinglish}
+
+\begin{document}
+
+\title{FactIndic: Factual Consistency of LLM Summaries\\for Hindi, Romanized Hindi and Hinglish}
+
+\author{
+\IEEEauthorblockN{\todo{Author 1}, \todo{Author 2}, \todo{Author 3}, \todo{Author 4}, \todo{Author 5}}
+\IEEEauthorblockA{\textit{\todo{Department}} \\
+\textit{\todo{University}}\\
+\todo{City, Country} \\
+\todo{email}}
+}
+
+\maketitle
+
+\input{sections/abstract}
+\input{sections/introduction}
+\input{sections/related}
+\input{sections/dataset}
+\input{sections/method}
+\input{sections/setup}
+\input{sections/results}
+\input{sections/error_analysis}
+\input{sections/conclusion}
+
+\bibliographystyle{IEEEtran}
+\bibliography{references}
+
+\end{document}

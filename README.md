@@ -320,6 +320,26 @@ python -c "from src.eval.entities import tune_threshold; tune_threshold()"
 
 ---
 
+## 📈 Figures and paper (Phase 5)
+
+```bash
+python -m src.analysis.make_figures   # paper/figures/*.pdf + *.png (300 dpi), cmi_correlations.csv
+cd paper && tectonic main.tex         # paper/main.pdf (IEEEtran); see paper/README.md
+```
+
+- **Figures:**
+  - (a) number and entity recall by condition × prompt;
+  - (b) wrong-language rate, gemma3:4b vs gpt-oss-120b;
+  - (c) both models' recall on the shared 50-article subset;
+  - (d) per-summary recall vs CMI for `hinglish`, with Spearman ρ.
+- **Style:** all figures are one IEEE column wide and use the Okabe-Ito colour-blind-safe palette with hatching. A placeholder is left for the metric-vs-human agreement figure.
+- **CMI vs recall:** for `hinglish`, number recall rises slightly with CMI (ρ = 0.17 / 0.18 for plain / factual, p ≈ 0.03). Entity recall shows no trend.
+  - As a control, the Devanagari (`hi`) summaries of the same articles show the same direction more weakly (ρ = 0.09 / 0.13, not significant).
+  - So part of the effect comes from the articles themselves, not from code-mixing, and there is no sign that more mixing hurts.
+- **Paper status:** Abstract, Introduction, Related Work, Dataset, Method and Experimental Setup are drafted. Results, Error Analysis and Conclusion are outlines with TODOs that wait for the human labels.
+
+---
+
 ## 📂 Project Structure
 
 ```
