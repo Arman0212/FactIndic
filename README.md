@@ -225,10 +225,16 @@ python -c "from src.eval.entities import tune_threshold; tune_threshold()"
 
 **Manual labels (5 annotators).** The 60 summaries are labelled by a team of five (A1-A5), following `results/annotation_packs/GUIDELINES.md`.
 - **Split** (`results/annotation_packs/assignment.csv`): 10 *shared* rows labelled by all five (for agreement) and 50 rows split 10 per annotator. It is stratified, so every annotator and the shared set get rows from all six condition × prompt cells. Each annotator sees 20 rows in their own random order and does not know which rows are shared.
-- **A1** labels with `label_server.py` into `labels_A1.csv`, in blind mode by default.
+- **A1** labels with `label_server.py` into `labels_A1.csv` under a **blind-first protocol** that the server enforces:
+  1. Choose a label, an error type and a note (both required for errors), then click **Lock & reveal draft**.
+  2. The locked decision (`label`, `error_type`, `notes`, `locked_at`) is permanent; a second lock is refused.
+  3. The LLM draft is only sent to the browser after locking.
+  4. A1 may then record a revision in `revised_label` / `revised_error_type` / `revised_notes`. The merge uses the blind locked label.
+  - A1's first pass, made with the drafts visible, is kept in `labels_A1_assisted.csv` for comparison only. It agreed with the drafts on 20 of 20 labels.
+  - `python -m src.eval.draft_agreement` compares the blind labels with the drafts (agreement, Cohen's kappa, confusion matrix, revisions).
 - **A2-A5** label offline in a self-contained page (`A2.html` etc., opened by double-click in Chrome). Labels autosave in the browser, and a button exports `labels_A2.csv`. These pages contain **no LLM draft labels**.
 - **Merge** (`merge_annotations.py`): writes every individual label to `all_labels.csv` and one *final* label per summary to `results/manual_annotation.csv` (columns `set`, `annotator`, `label`, `error_type`, `notes`). Shared rows take the majority label; a tie goes to the more severe label. The script prints Fleiss' kappa (all five) and pairwise Cohen's kappa on the shared rows, for 3 labels and for faithful vs error. `agreement.py` uses these final labels.
-- **Drafts and anchoring.** `draft_label`, `draft_error_type` and `draft_note` are suggestions written by an LLM (Claude), shown only to A1. `label_source` records how A1's labels relate to the draft (`same_as_draft`, `changed_from_draft`, `_blind` if the draft was hidden), `blind_pack` for teammates, and `majority` / `majority_tie` for merged shared rows. Labels copied from a draft are not independent human judgments, so report these counts alongside the agreement numbers.
+- **Drafts and anchoring.** `draft_label`, `draft_error_type` and `draft_note` are suggestions written by an LLM (Claude), shown only to A1. `label_source` records how A1's locked blind label relates to the draft (`same_as_draft_blind` / `changed_from_draft_blind`), `blind_pack` for teammates, and `majority` / `majority_tie` for merged shared rows. Labels copied from a draft are not independent human judgments, so report these counts alongside the agreement numbers.
 
 **Outputs**
 - `results/scores_<model>.csv`: one row per summary.

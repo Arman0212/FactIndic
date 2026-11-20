@@ -18,6 +18,7 @@
     }
   }
   * { box-sizing: border-box; }
+  [hidden] { display: none !important; }  /* beat display:grid on .yours */
   body { margin: 0; background: var(--bg); color: var(--ink);
          font: 15px/1.55 -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans", "Noto Sans Devanagari", "Kohinoor Devanagari", sans-serif; }
   header { position: sticky; top: 0; z-index: 2; display: flex; flex-wrap: wrap; gap: 10px 16px; align-items: center;
@@ -58,7 +59,12 @@
   .status { font-size: 13px; color: var(--muted); min-height: 1em; }
   .nav { display: flex; gap: 8px; justify-content: space-between; margin-top: 6px; }
   .keys { font-size: 12px; color: var(--muted); }
-  label.toggle { font-size: 13px; display: flex; gap: 6px; align-items: center; }
+  .locked { border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; background: var(--bg); }
+  .badge { font-size: 12px; border-radius: 999px; padding: 1px 8px; border: 1px solid var(--line); }
+  .badge.same { color: var(--ok); border-color: var(--ok); } .badge.diff { color: var(--minor); border-color: var(--minor); }
+  .err { color: var(--bad); font-size: 13px; min-height: 1em; }
+  button:disabled { opacity: .45; cursor: not-allowed; }
+  .rev { border-top: 1px dashed var(--line); padding-top: 10px; }
 </style>
 </head>
 <body>
@@ -67,9 +73,9 @@
   <span class="chip" id="pos">-</span>
   <span class="chip" id="cond">-</span>
   <span class="chip" id="rid" title="article id">-</span>
-  <div class="progress" title="labelled"><div id="bar"></div></div>
-  <span class="chip" id="done">0 labelled</span>
-  <label class="toggle"><input type="checkbox" id="blind" checked> Blind mode (hide draft until I label)</label>
+  <div class="progress" title="locked"><div id="bar"></div></div>
+  <span class="chip" id="done">0 locked</span>
+  <span class="chip" title="The LLM draft is only sent to this page after you lock your own label.">Blind protocol: draft after lock</span>
 </header>
 
 <main>
@@ -86,50 +92,75 @@
       <span class="name bad">not found in source</span> (automatic check, may be wrong)
     </div>
 
-    <div class="draft" id="draftBox">
-      <div class="row"><strong>Draft suggestion</strong>
-        <button id="accept" class="primary" title="shortcut: A">Accept draft</button></div>
-      <div class="draft-body">
-        <div><span class="lbl" id="dLabel"></span> <span id="dType" class="chip"></span></div>
-        <div class="draft-note" id="dNote"></div>
-      </div>
-      <div class="draft-hidden-msg status" id="hiddenMsg"></div>
-    </div>
-
-    <div class="yours">
-      <strong>Your label</strong>
-      <div class="labels">
+    <!-- step 1: blind decision -->
+    <div class="yours" id="blindBox">
+      <strong>Your blind label</strong>
+      <div class="labels" id="labels">
         <button data-v="faithful" title="shortcut: 1">1 · faithful</button>
         <button data-v="minor_error" title="shortcut: 2">2 · minor error</button>
         <button data-v="major_error" title="shortcut: 3">3 · major error</button>
       </div>
-      <select id="etype" aria-label="error type">
-        <option value="">error type (leave empty if faithful)</option>
-        <option value="entity">entity</option>
-        <option value="number">number</option>
-        <option value="added_info">added_info</option>
-        <option value="meaning">meaning</option>
-        <option value="omission">omission</option>
-        <option value="other">other</option>
-      </select>
-      <textarea id="notes" placeholder="Notes (saved automatically)"></textarea>
-      <div class="status" id="status"></div>
-      <div class="nav">
-        <button id="prev">← Prev</button>
-        <button id="nextUn">Next unlabelled</button>
-        <button id="next">Next →</button>
-      </div>
-      <div class="keys">Keys: ← → navigate · 1 2 3 label · A accept draft (not while typing in notes)</div>
+      <select id="etype" aria-label="error type"></select>
+      <textarea id="notes" placeholder="Notes: quote the wrong claim and what the article says (required for errors)"></textarea>
+      <div class="err" id="err"></div>
+      <button class="primary" id="lock">🔒 Lock &amp; reveal draft</button>
+      <div class="status">Locking is permanent: your blind label cannot be changed afterwards.</div>
     </div>
+
+    <!-- after locking -->
+    <div id="lockedBox" hidden>
+      <div class="yours">
+        <strong>Your blind label (locked <span id="lockedAt"></span>)</strong>
+        <div class="locked"><span class="lbl" id="lLabel"></span> <span class="chip" id="lType"></span>
+          <div class="draft-note" id="lNotes"></div></div>
+      </div>
+      <div class="draft">
+        <div class="row"><strong>LLM draft</strong> <span class="badge" id="match"></span></div>
+        <div><span class="lbl" id="dLabel"></span> <span id="dType" class="chip"></span></div>
+        <div class="draft-note" id="dNote"></div>
+      </div>
+      <div class="yours rev">
+        <strong>Changed your mind after seeing the draft? (optional, stored separately)</strong>
+        <div class="labels" id="rlabels">
+          <button data-v="faithful">faithful</button>
+          <button data-v="minor_error">minor error</button>
+          <button data-v="major_error">major error</button>
+        </div>
+        <select id="retype" aria-label="revised error type"></select>
+        <textarea id="rnotes" placeholder="Why did you change it? (required for an error label)"></textarea>
+        <div class="err" id="rerr"></div>
+        <div class="row"><button id="revise">Save revision</button> <span class="status" id="rstatus"></span></div>
+      </div>
+    </div>
+
+    <div class="nav">
+      <button id="prev">← Prev</button>
+      <button id="nextUn">Next unlocked</button>
+      <button id="next">Next →</button>
+    </div>
+    <div class="keys">Keys: ← → navigate · 1 2 3 choose label (before locking; not while typing)</div>
   </section>
 </main>
 
 <script>
-let rows = [], cur = 0, saveTimer = null;
+let rows = [], cur = 0, rev = { label: "" };
 const $ = (id) => document.getElementById(id);
 const PRETTY = { faithful: "faithful", minor_error: "minor error", major_error: "major error" };
+const TYPES = [["", "error type (leave empty if faithful)"], ["entity", "entity"], ["number", "number"],
+  ["added_info", "added_info"], ["meaning", "meaning"], ["omission", "omission"], ["other", "other"]];
+for (const sel of [$("etype"), $("retype")])
+  for (const [v, t] of TYPES) { const o = document.createElement("option"); o.value = v; o.textContent = t; sel.append(o); }
 
-function store(key, val) { try { if (val === undefined) return localStorage.getItem(key); localStorage.setItem(key, val); } catch (e) { return null; } }
+// unlocked work in progress lives in this browser until it is locked
+const PENDING_KEY = "factindic_pending_A1";
+function pendingAll() { try { return JSON.parse(localStorage.getItem(PENDING_KEY) || "{}"); } catch (e) { return {}; } }
+const key = (r) => r.id + "|" + r.condition + "|" + r.prompt_type;
+function pending(r) { return pendingAll()[key(r)] || { label: "", error_type: "", notes: "" }; }
+function setPending(r, fields) {
+  const all = pendingAll(); all[key(r)] = Object.assign(pending(r), fields);
+  try { localStorage.setItem(PENDING_KEY, JSON.stringify(all)); } catch (e) {}
+}
+function clearPending(r) { const all = pendingAll(); delete all[key(r)]; try { localStorage.setItem(PENDING_KEY, JSON.stringify(all)); } catch (e) {} }
 
 function render(el, segs) {
   el.replaceChildren();
@@ -142,8 +173,7 @@ function render(el, segs) {
     el.append(span);
   }
 }
-
-function draftVisible(r) { return !$("blind").checked || !!r.label; }
+function press(container, v) { container.querySelectorAll("button").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.v === v))); }
 
 function show() {
   const r = rows[cur];
@@ -153,89 +183,99 @@ function show() {
   render($("source"), r.source_seg);
   render($("summary"), r.summary_seg);
   $("source").scrollTop = 0;
-  $("dLabel").textContent = PRETTY[r.draft_label] || r.draft_label;
-  $("dLabel").className = "lbl " + r.draft_label;
-  $("dType").textContent = r.draft_error_type || "no error";
-  $("dNote").textContent = r.draft_note;
-  const vis = draftVisible(r);
-  $("draftBox").classList.toggle("hidden-draft", !vis);
-  $("accept").hidden = !vis;
-  $("hiddenMsg").textContent = vis ? "" : "Draft hidden - choose your label first.";
-  document.querySelectorAll(".labels button").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.v === r.label)));
-  $("etype").value = r.error_type || "";
-  $("notes").value = r.notes || "";
-  $("status").textContent = r.label ? `Saved · ${r.label_source || ""}` : "";
-  updateProgress();
-}
-
-function updateProgress() {
-  const n = rows.filter(r => r.label).length;
-  $("done").textContent = `${n}/${rows.length} labelled`;
-  $("bar").style.width = (100 * n / rows.length) + "%";
-}
-
-async function save(fields) {
-  const r = rows[cur];
-  const seen = draftVisible(r);
-  Object.assign(r, fields);
-  $("status").textContent = "Saving…";
-  try {
-    const res = await fetch("/api/save", { method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ i: r.i, seen_draft: seen, ...fields }) });
-    const out = await res.json();
-    r.label_source = out.label_source;
-    $("status").textContent = `Saved · ${out.label_source || "no label yet"}`;
-  } catch (e) {
-    $("status").textContent = "NOT saved - is the server still running? (" + e + ")";
+  const locked = !!r.locked_at;
+  $("blindBox").hidden = locked;
+  $("lockedBox").hidden = !locked;
+  $("err").textContent = ""; $("rerr").textContent = ""; $("rstatus").textContent = "";
+  if (!locked) {
+    const p = pending(r);
+    press($("labels"), p.label);
+    $("etype").value = p.error_type; $("notes").value = p.notes;
+  } else {
+    $("lockedAt").textContent = r.locked_at.replace("T", " ");
+    $("lLabel").textContent = PRETTY[r.label]; $("lLabel").className = "lbl " + r.label;
+    $("lType").textContent = r.error_type || "no error"; $("lNotes").textContent = r.notes;
+    $("dLabel").textContent = PRETTY[r.draft_label] || r.draft_label; $("dLabel").className = "lbl " + r.draft_label;
+    $("dType").textContent = r.draft_error_type || "no error"; $("dNote").textContent = r.draft_note;
+    const same = r.label_source.startsWith("same");
+    $("match").textContent = same ? "same as your label" : "differs from your label";
+    $("match").className = "badge " + (same ? "same" : "diff");
+    rev = { label: r.revised_label || r.label };
+    press($("rlabels"), rev.label);
+    $("retype").value = r.revised_label ? r.revised_error_type : r.error_type;
+    $("rnotes").value = r.revised_notes || "";
+    if (r.revised_label) $("rstatus").textContent = `Revision saved: ${PRETTY[r.revised_label]}`;
   }
   updateProgress();
 }
 
-function setLabel(v) {
-  const r = rows[cur];
+function updateProgress() {
+  const n = rows.filter(r => r.locked_at).length;
+  $("done").textContent = `${n}/${rows.length} locked`;
+  $("bar").style.width = (100 * n / rows.length) + "%";
+}
+
+function choose(v) {
+  const r = rows[cur]; if (r.locked_at) return;
   const fields = { label: v };
-  if (v === "faithful") fields.error_type = "";      // faithful has no error type
-  else fields.error_type = $("etype").value;
-  save(fields).then(show);
+  if (v === "faithful") fields.error_type = "";
+  setPending(r, fields); show();
 }
 
-function acceptDraft() {
+async function post(url, body) {
+  const res = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+  return res.json();
+}
+
+async function lock() {
+  const r = rows[cur], p = pending(r);
+  p.notes = $("notes").value; p.error_type = $("etype").value;
+  try {
+    const out = await post("/api/lock", { i: r.i, ...p });
+    if (!out.ok) { $("err").textContent = out.error; return; }
+    rows[cur] = out.row; clearPending(r); show();
+  } catch (e) { $("err").textContent = "NOT saved - is the server still running? (" + e + ")"; }
+}
+
+async function revise() {
   const r = rows[cur];
-  if (!draftVisible(r)) return;
-  save({ label: r.draft_label, error_type: r.draft_error_type }).then(show);
+  try {
+    const out = await post("/api/revise", { i: r.i, label: rev.label, error_type: $("retype").value, notes: $("rnotes").value });
+    if (!out.ok) { $("rerr").textContent = out.error; return; }
+    rows[cur] = out.row; show();
+    $("rstatus").textContent = out.row.revised_label ? `Revision saved: ${PRETTY[out.row.revised_label]}` : "No revision (same as your blind label).";
+  } catch (e) { $("rerr").textContent = "NOT saved - is the server still running? (" + e + ")"; }
 }
 
-function go(i) { if (i >= 0 && i < rows.length) { flushNotes(); cur = i; store("factindic_cur_A1", String(cur)); show(); } }
-function flushNotes() { if (saveTimer) { clearTimeout(saveTimer); saveTimer = null; save({ notes: $("notes").value }); } }
+function go(i) { if (i >= 0 && i < rows.length) { cur = i; try { localStorage.setItem("factindic_cur_A1", String(cur)); } catch (e) {} show(); } }
 
-document.querySelectorAll(".labels button").forEach(b => b.addEventListener("click", () => setLabel(b.dataset.v)));
-$("etype").addEventListener("change", () => { if (rows[cur].label) save({ label: rows[cur].label, error_type: $("etype").value }); else save({ error_type: $("etype").value }); });
-$("notes").addEventListener("input", () => { clearTimeout(saveTimer); saveTimer = setTimeout(() => { saveTimer = null; save({ notes: $("notes").value }); }, 600); });
-$("notes").addEventListener("blur", flushNotes);
-$("accept").addEventListener("click", acceptDraft);
+$("labels").querySelectorAll("button").forEach(b => b.addEventListener("click", () => choose(b.dataset.v)));
+$("etype").addEventListener("change", () => setPending(rows[cur], { error_type: $("etype").value }));
+$("notes").addEventListener("input", () => setPending(rows[cur], { notes: $("notes").value }));
+$("lock").addEventListener("click", lock);
+$("rlabels").querySelectorAll("button").forEach(b => b.addEventListener("click", () => {
+  rev.label = b.dataset.v; if (rev.label === "faithful") $("retype").value = ""; press($("rlabels"), rev.label); }));
+$("revise").addEventListener("click", revise);
 $("prev").addEventListener("click", () => go(cur - 1));
 $("next").addEventListener("click", () => go(cur + 1));
 $("nextUn").addEventListener("click", () => {
-  for (let k = 1; k <= rows.length; k++) { const j = (cur + k) % rows.length; if (!rows[j].label) return go(j); }
-  $("status").textContent = "All rows are labelled.";
+  for (let k = 1; k <= rows.length; k++) { const j = (cur + k) % rows.length; if (!rows[j].locked_at) return go(j); }
+  $("err").textContent = "All rows are locked.";
 });
-$("blind").addEventListener("change", () => { store("factindic_blind_A1", $("blind").checked ? "1" : "0"); show(); });
 document.addEventListener("keydown", (e) => {
-  if (e.target.tagName === "TEXTAREA" || e.target.tagName === "SELECT" || e.metaKey || e.ctrlKey) return;
+  const t = e.target.tagName;
+  if (t === "TEXTAREA" || t === "SELECT" || t === "INPUT" || e.metaKey || e.ctrlKey || e.altKey) return;
   if (e.key === "ArrowLeft") go(cur - 1);
   else if (e.key === "ArrowRight") go(cur + 1);
-  else if (e.key === "1") setLabel("faithful");
-  else if (e.key === "2") setLabel("minor_error");
-  else if (e.key === "3") setLabel("major_error");
-  else if (e.key === "a" || e.key === "A") acceptDraft();
+  else if (e.key === "1") choose("faithful");
+  else if (e.key === "2") choose("minor_error");
+  else if (e.key === "3") choose("major_error");
 });
-window.addEventListener("beforeunload", flushNotes);
 
 (async () => {
-  $("blind").checked = store("factindic_blind_A1") !== "0";  // blind mode ON unless switched off
   rows = (await (await fetch("/api/rows")).json()).rows;
-  const saved = parseInt(store("factindic_cur_A1") || "", 10);
-  cur = Number.isInteger(saved) && saved < rows.length ? saved : Math.max(0, rows.findIndex(r => !r.label));
+  let saved = NaN; try { saved = parseInt(localStorage.getItem("factindic_cur_A1") || "", 10); } catch (e) {}
+  cur = Number.isInteger(saved) && saved < rows.length ? saved : Math.max(0, rows.findIndex(r => !r.locked_at));
   show();
 })();
 </script>

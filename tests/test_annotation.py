@@ -39,3 +39,21 @@ def test_cohen_kappa():
 
 def test_binary():
     assert binary(["faithful", "minor_error", "major_error"]) == ["faithful", "error", "error"]
+
+
+# ---------------------------------------------------------------- A1 blind protocol
+from src.eval.label_server import check_decision, compare_with_draft  # noqa: E402
+
+
+def test_check_decision_rules():
+    assert check_decision("faithful", "", "") == ""
+    assert check_decision("faithful", "meaning", "") != ""          # faithful has no type
+    assert check_decision("minor_error", "", "x") != ""             # error needs a type
+    assert check_decision("major_error", "meaning", "  ") != ""     # ... and a note
+    assert check_decision("major_error", "meaning", "won vs lost") == ""
+    assert check_decision("", "", "") != ""
+
+
+def test_compare_with_draft_is_always_blind():
+    assert compare_with_draft("faithful", "", "faithful", "") == "same_as_draft_blind"
+    assert compare_with_draft("minor_error", "entity", "minor_error", "meaning") == "changed_from_draft_blind"

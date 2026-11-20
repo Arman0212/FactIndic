@@ -3,7 +3,8 @@ FactIndic - split the manual annotation across 5 annotators (A1-A5)
 ===================================================================
 Creates results/annotation_packs/:
   assignment.csv       which annotator(s) label which of the 60 rows
-  labels_A1.csv        A1's own labels (written by src/eval/label_server.py)
+  labels_A1.csv        A1's own labels (written by src/eval/label_server.py,
+                       blind-first protocol)
   A2.html .. A5.html   one self-contained offline labelling page per teammate
 
 The split (60 rows = 6 cells "condition x prompt", 10 rows per cell):
@@ -13,7 +14,9 @@ The split (60 rows = 6 cells "condition x prompt", 10 rows per cell):
   dealt in turn to [shared, A1, A2, A3, A4, A5]. Ten consecutive rows of a cell
   cover all six buckets, so every bucket gets 1-2 rows from EVERY cell.
   Rows A1 had already labelled are swapped into A1's own bucket, so those
-  labels are kept.
+  labels were kept at the time of the split. (Those early labels, made with
+  the draft visible, were later moved to labels_A1_assisted.csv; A1 relabels
+  all 20 rows blind.)
 
 Each annotator sees 20 rows (shared + own), in a per-annotator shuffled order,
 and does not know which rows are the shared ones.
@@ -117,16 +120,25 @@ def rows_for(annotator: str, ann: pd.DataFrame, assign: pd.DataFrame) -> pd.Data
     return rows.loc[order].reset_index(drop=True)
 
 
+# A1's label file has extra columns for the blind-first protocol (see label_server.py)
+OWNER_COLUMNS = LABEL_COLUMNS + ["label_source", "locked_at",
+                                 "revised_label", "revised_error_type", "revised_notes"]
+
+
 def init_owner_labels(ann: pd.DataFrame, assign: pd.DataFrame):
-    """Create labels_A1.csv once, copying labels A1 already made in
-    manual_annotation.csv (before the split)."""
+    """Create an EMPTY labels_A1.csv (A1's 20 rows, nothing labelled) if it
+    does not exist. Labels are only ever written by label_server.py, when A1
+    locks a blind decision."""
     path = labels_path(OWNER)
     if path.exists():
         return
-    rows = rows_for(OWNER, ann, assign)
+    rows = rows_for(OWNER, ann, assign)[KEY].copy()
     rows["annotator"] = OWNER
-    write_csv(rows[LABEL_COLUMNS + ["label_source"]], path)
-    print(f"Wrote {path} ({int((rows['label'] != '').sum())} existing labels kept)")
+    for col in OWNER_COLUMNS:
+        if col not in rows.columns:
+            rows[col] = ""
+    write_csv(rows[OWNER_COLUMNS], path)
+    print(f"Wrote {path} (empty, {len(rows)} rows)")
 
 
 # ---------------------------------------------------------------- pages
