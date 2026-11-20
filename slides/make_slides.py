@@ -35,6 +35,7 @@ VERMILION = RGBColor(0xB8, 0x5C, 0x00)
 GREEN = RGBColor(0x00, 0x7A, 0x5E)
 TINT = RGBColor(0xF1, 0xF4, 0xF8)
 WHITE = RGBColor(0xFF, 0xFF, 0xFF)
+MUTED_LIGHT = RGBColor(0xB8, 0xC2, 0xD3)
 HEAD, BODY = "Cambria", "Calibri"
 DEVA = "Nirmala UI"  # Windows; PowerPoint on macOS falls back to Kohinoor Devanagari
 
@@ -77,6 +78,10 @@ def text(slide, x, y, w, h, runs, size=18, color=INK, font=BODY, bold=False, ali
             f.bold = opt.get("bold", bold)
             f.italic = opt.get("italic", italic)
             f.color.rgb = opt.get("color", color)
+            if "url" in opt:
+                r.hyperlink.address = opt["url"]
+            if "underline" in opt:
+                f.underline = opt["underline"]
     return box
 
 
@@ -147,19 +152,52 @@ def arrow(slide, x1, y1, x2, y2):
 def slide_title(prs):
     s = prs.slides.add_slide(prs.slide_layouts[6])
     background(s, NAVY)
-    text(s, MARGIN, Inches(1.5), Inches(11.5), Inches(2.2),
-         [[("FactIndic", {"color": ORANGE})],
-          "Factuality-Aware Summarization for Hindi and Code-Mixed Hindi-English"],
-         size=40, font=HEAD, bold=True, color=WHITE, spacing=10)
-    text(s, MARGIN, Inches(4.15), Inches(11.5), Inches(0.5),
-         "Arman Sahni  ·  Ananya Mishra  ·  Gauri Mahajan  ·  Krati Khanna  ·  Arushi Chakraborty",
-         size=20, color=WHITE)
-    text(s, MARGIN, Inches(4.85), Inches(11.5), Inches(1.0),
+
+    # 1. Project Title
+    text(s, MARGIN, Inches(1.10), W - 2 * MARGIN, Inches(1.8),
+         [[("FactIndic", {"color": ORANGE, "size": 42})],
+          [("Factuality-Aware Summarization for Hindi and Code-Mixed Hindi-English",
+            {"color": WHITE, "size": 26, "font": HEAD, "bold": True})]],
+         size=26, font=HEAD, bold=True, color=WHITE, spacing=8)
+
+    # 2. Team members with enrolment numbers (clean 2-column list)
+    col_w = Inches(5.8)
+    col1 = [
+        [("Arman Sahni", {"bold": True, "color": WHITE}),
+         (" - S24CSEU1430", {"color": MUTED_LIGHT, "bold": False})],
+        [("Ananya Mishra", {"bold": True, "color": WHITE}),
+         (" - S24CSEU1431", {"color": MUTED_LIGHT, "bold": False})],
+        [("Gauri Mahajan", {"bold": True, "color": WHITE}),
+         (" - S24CSEU1435", {"color": MUTED_LIGHT, "bold": False})],
+    ]
+    col2 = [
+        [("Krati Khanna", {"bold": True, "color": WHITE}),
+         (" - S24CSEU0024", {"color": MUTED_LIGHT, "bold": False})],
+        [("Arushi Chakraborty", {"bold": True, "color": WHITE}),
+         (" - S24CSEU1269", {"color": MUTED_LIGHT, "bold": False})],
+    ]
+    text(s, MARGIN, Inches(3.25), col_w, Inches(1.3), col1, size=17, spacing=8)
+    text(s, MARGIN + col_w + Inches(0.4), Inches(3.25), col_w, Inches(1.3), col2, size=17, spacing=8)
+
+    # 3. Public repository link (clickable)
+    repo_url = f"https://{GITHUB}"
+    text(s, MARGIN, Inches(4.75), W - 2 * MARGIN, Inches(0.5),
+         [[("Code, paper & slides:  ", {"color": MUTED_LIGHT, "size": 17}),
+           (repo_url, {"color": ORANGE, "bold": True, "size": 17, "url": repo_url, "underline": True})]],
+         size=17)
+
+    # 4. Course line
+    text(s, MARGIN, Inches(5.75), W - 2 * MARGIN, Inches(0.9),
          ["CSET 346 Natural Language Processing  ·  Bennett University",
-          "Instructor: Dr. Geetanjali Singh"], size=16, color=RGBColor(0xB8, 0xC2, 0xD3), spacing=4)
+          "Instructor: Dr. Geetanjali Singh"],
+         size=14, color=MUTED_LIGHT, spacing=4)
+
+    # Speaker notes
     s.notes_slide.notes_text_frame.text = (
         "Good morning. We are presenting FactIndic, a study of whether LLM summaries stay faithful to "
         "the article when the input is Hindi, Romanized Hindi or Hinglish. "
+        "Our team members are Arman Sahni, Ananya Mishra, Gauri Mahajan, Krati Khanna, and Arushi Chakraborty. "
+        f"All project resources—including our code, paper, and presentation deck—are available in one place on GitHub at {repo_url}. "
         "Everything is training-free: we only prompt existing models and evaluate their outputs.")
 
 
@@ -405,6 +443,15 @@ def slide_conclusion(prs):
 def main():
     prs = Presentation()
     prs.slide_width, prs.slide_height = W, H
+
+    # Update theme hyperlink color so links default to vibrant orange (E69F00) instead of dark blue
+    for part in prs.part.package.iter_parts():
+        if "theme" in str(part.partname):
+            xml = part.blob.decode("utf-8")
+            xml = xml.replace('<a:hlink><a:srgbClr val="0000FF"/></a:hlink>',
+                              '<a:hlink><a:srgbClr val="E69F00"/></a:hlink>')
+            part._blob = xml.encode("utf-8")
+
     for make in (slide_title, slide_problem, slide_method, slide_result1, slide_result2, slide_result3,
                  slide_examples, slide_conclusion):
         make(prs)
