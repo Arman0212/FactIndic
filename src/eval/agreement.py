@@ -28,7 +28,13 @@ than chance on this data.
 
 Writes results/metric_agreement.csv (used by src/analysis/make_figures.py).
 
-Run:  python -m src.eval.agreement [--model gemma3:4b]
+Sensitivity check:  --without A1  rebuilds the final labels from
+results/annotation_packs/all_labels.csv WITHOUT that annotator (their own
+10 rows drop out; shared rows take the majority of the other four) and
+reports the label distribution and the AUCs on that set. It does not write
+results/metric_agreement.csv.
+
+Run:  python -m src.eval.agreement [--model gemma3:4b] [--without A1]
 """
 
 import argparse
@@ -83,7 +89,10 @@ def bootstrap_ci(y: np.ndarray, x: np.ndarray) -> tuple:
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--model", default="gemma3:4b")
+    parser.add_argument("--without", default="", help="leave out one annotator, e.g. A1")
     args = parser.parse_args()
+    if args.without:
+        return sensitivity(args.model, args.without)
 
     ann = pd.read_csv(ANNOTATION_PATH, encoding="utf-8-sig")
     if "annotator" not in ann.columns:
@@ -131,6 +140,27 @@ def main():
         d = data.loc[data["label"] != "minor_error", ["faithful", m]].dropna()
         r, auc = r_and_auc(d["faithful"].to_numpy(int), d[m].to_numpy(float))
         print(f"  {m:<18} n={len(d):>3}  AUC {auc:.3f}")
+
+
+def sensitivity(model: str, left_out: str):
+    """Final labels without one annotator, then the same r / AUC table."""
+    from src.eval.merge_annotations import ALL_LABELS_PATH, majority_label
+    labels = pd.read_csv(ALL_LABELS_PATH, encoding="utf-8-sig", dtype=str, keep_default_na=False)
+    labels = labels[labels["annotator"] != left_out]
+    keys = ["id", "condition", "prompt_type"]
+    finals = labels.groupby(keys)["label"].apply(lambda g: majority_label(list(g))[0]).reset_index()
+    finals["faithful"] = finals["label"].map(LABELS)
+    print(f"Without {left_out}: {len(finals)} summaries, "
+          + ", ".join(f"{lab} {(finals['label'] == lab).sum()}" for lab in LABELS)
+          + f"; error rate {(finals['faithful'] == 0).mean():.0%}")
+    data = finals.merge(pd.read_csv(scores_path(model)), on=keys)
+    for m in METRICS:
+        d = data[["faithful", m]].dropna()
+        y, x = d["faithful"].to_numpy(int), d[m].to_numpy(float)
+        r, auc = r_and_auc(y, x)
+        _, (lo, hi) = bootstrap_ci(y, x)
+        print(f"  {m:<18} n={len(d):>3}  AUC {auc:.3f} [{lo:.3f}, {hi:.3f}]")
+
 
 if __name__ == "__main__":
     main()

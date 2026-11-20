@@ -1,6 +1,6 @@
 % FactIndic - IEEE conference paper (IEEEtran, 2-column).
-% Build:  cd paper && tectonic main.tex        (or: latexmk -pdf main.tex)
-% Word:   cd paper && pandoc main.tex --citeproc --bibliography=references.bib -o FactIndic.docx
+% Build:  cd paper && tectonic main.tex        (or: latexmk -xelatex main.tex; XeTeX is needed)
+% Word:   python paper/make_docx.py   (IEEE Word layout, see paper/README.md)
 % Sections live in sections/*.tex; figures are made by
 %   python -m src.analysis.make_figures   (writes paper/figures/*.pdf|png)
 \documentclass[conference]{IEEEtran}
@@ -18,6 +18,12 @@
 
 \graphicspath{{figures/}}
 
+% Devanagari words in the text (XeTeX/tectonic): \dev{बाढ़}
+% Font: fonts/NotoSerifDevanagari-Regular.ttf (SIL Open Font License, fonts/OFL.txt),
+% loaded with a plain XeTeX \font command so newtx (Times) is left untouched.
+\font\devfont="[fonts/NotoSerifDevanagari-Regular.ttf]:script=deva" at 9pt
+\newcommand{\dev}[1]{{\devfont #1}}
+
 % Visible markers for unfinished parts. Search for "TODO" before submission.
 \newcommand{\todo}[1]{\textcolor{red}{\textbf{[TODO:} #1\textbf{]}}}
 \newcommand{\cond}[1]{\textsc{#1}}   % condition names: \cond{hi}, \cond{hi-rom}, \cond{hinglish}
@@ -27,11 +33,9 @@
 \title{FactIndic: Factual Consistency of LLM Summaries\\for Hindi, Romanized Hindi and Hinglish}
 
 \author{
-\IEEEauthorblockN{\todo{Author 1}, \todo{Author 2}, \todo{Author 3}, \todo{Author 4}, \todo{Author 5}}
-\IEEEauthorblockA{\textit{\todo{Department}} \\
-\textit{\todo{University}}\\
-\todo{City, Country} \\
-\todo{email}}
+\IEEEauthorblockN{Arman Sahni, Ananya Mishra, Gauri Mahajan, Krati Khanna, Arushi Chakraborty}
+\IEEEauthorblockA{\textit{Department of Computer Science and Engineering}, \textit{Bennett University}, Greater Noida, India\\
+\{s24cseu1430, s24cseu1431, s24cseu1435, s24cseu0024, s24cseu1269\}@bennett.edu.in}
 }
 
 \maketitle
@@ -45,6 +49,9 @@
 \input{sections/results}
 \input{sections/error_analysis}
 \input{sections/conclusion}
+
+\section*{Acknowledgment}
+We thank Dr.\ Geetanjali Singh, Bennett University, for her guidance on this CSET~346 Natural Language Processing project.
 
 \bibliographystyle{IEEEtran}
 \bibliography{references}

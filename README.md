@@ -7,13 +7,76 @@
 
 ## 📌 Project Overview
 
-**FactIndic** investigates the factual consistency of abstractive text summarization on **Hindi** and **Hinglish (Hindi-English code-mixed)** text. 
+**FactIndic** measures the factual consistency of LLM summaries of the same news articles in three forms: **Devanagari Hindi** (`hi`), **Romanized Hindi** (`hi_roman`, same words in Roman script) and **Hinglish** (`hinglish`, a code-mixed rewrite with the same facts). No model is trained: we prompt existing models and evaluate what they write.
 
-A critical challenge with modern Large Language Models (LLMs) is **hallucination**—inventing facts, misattributing numerical figures, or swapping named entities. In low-resource or code-mixed settings like Hinglish, these errors are even more prevalent due to tokenization quirks and cross-lingual drift.
+- **Data:** 186 BBC Hindi articles from XL-Sum, each in the three forms (mean Code-Mixing Index of the Hinglish rewrites 17.6).
+- **Models:** gemma3:4b run locally with Ollama (all 186 articles, 1,116 summaries) and gpt-oss-120b on Groq (50 articles, 200 summaries), each with a *plain* and a *factuality-aware* prompt.
+- **Evaluation:** script-independent number and entity precision/recall, SummaC-style NLI (two variants), ROUGE, BERTScore, a wrong-language check, and 60 summaries labelled by five annotators.
 
-**Key Design Principle:** We do **NOT** train models. Instead, we:
-1. Query foundation models (via Google Gemini or Groq APIs) using baseline (plain) prompts vs. factuality-aware prompts.
-2. Rigorously evaluate factual integrity using entity/number precision-recall-F1, Natural Language Inference (NLI) cross-lingual models (`mDeBERTa`), ROUGE, and BERTScore.
+**Paper:** [`paper/FactIndic_IEEE.pdf`](paper/FactIndic_IEEE.pdf) (IEEE, LaTeX) · Word version [`paper/FactIndic_IEEE.docx`](paper/FactIndic_IEEE.docx) · **Slides:** [`slides/FactIndic_presentation.pptx`](slides/FactIndic_presentation.pptx)
+
+### Results in brief
+
+| Finding | Number |
+|---|---|
+| gemma3:4b answers in the wrong language/script | 3.0% overall; up to 9.1% (Hinglish, factual prompt); gpt-oss-120b 0/200 |
+| Number and entity precision | ≥ 0.97 in every condition: invented names/numbers are rare |
+| Factual prompt raises number recall (Hindi) | 0.23 → 0.56 |
+| Human-labelled summaries with an error | 34/60 = 57% (95% CI 44-68%); 20% major |
+| Inter-annotator agreement (faithful vs error) | Fleiss' κ = 0.38, Krippendorff's α = 0.44 |
+| Metric vs human (AUC, faithful vs error) | NLI chunk 0.49, NLI window 0.39, ROUGE-L 0.60, BERTScore 0.58: every 95% CI includes 0.5 |
+
+Most human-found errors are **relation errors** (correct names and numbers in a wrong relation, e.g. an abandoned match reported as a win), which no automatic metric detects.
+
+### Team
+
+Department of Computer Science and Engineering, Bennett University, Greater Noida, India. CSET 346 Natural Language Processing, instructor **Dr. Geetanjali Singh**.
+
+| Name | Email | Annotator |
+|---|---|---|
+| Arman Sahni | s24cseu1430@bennett.edu.in | A1 |
+| Ananya Mishra | s24cseu1431@bennett.edu.in | A2-A5 |
+| Gauri Mahajan | s24cseu1435@bennett.edu.in | A2-A5 |
+| Krati Khanna | s24cseu0024@bennett.edu.in | A2-A5 |
+| Arushi Chakraborty | s24cseu1269@bennett.edu.in | A2-A5 |
+
+---
+
+## 🔁 How to reproduce
+
+Every step is a script; outputs already in the repository are reused, so each step can be re-run on its own.
+
+```bash
+python3.11 -m venv venv && source venv/bin/activate && pip install -r requirements.txt
+cp .env.example .env                      # add GROQ_API_KEY (only needed for gpt-oss-120b / Hinglish generation)
+
+# 1. data (Phase 2)
+python -m src.data.load_xlsum && python -m src.data.make_hinglish
+python -m src.data.check_hinglish && python -m src.data.fix_flagged && python -m src.data.add_roman
+
+# 2. summaries (Phase 3; needs Ollama with gemma3:4b)
+python -m src.summarize --provider ollama --model gemma3:4b
+python -m src.summarize --provider groq --model openai/gpt-oss-120b --limit 50
+
+# 3. automatic evaluation (Phase 4)
+python -m src.evaluate --model gemma3:4b && python -m src.evaluate --model openai/gpt-oss-120b
+python -m src.eval.compare_models
+
+# 4. human labels -> agreement (label files are in results/annotation_packs/)
+python -m src.eval.merge_annotations        # kappa / alpha, final labels, error types
+python -m src.eval.agreement                # metric vs human: r, AUC, 95% bootstrap CIs
+python -m src.eval.agreement --without A1   # sensitivity check
+python -m src.eval.draft_agreement          # A1's blind labels vs LLM suggestions
+
+# 5. figures, paper, Word version, slides (Phase 5)
+python -m src.analysis.make_figures
+(cd paper && tectonic main.tex && cp main.pdf FactIndic_IEEE.pdf)
+python paper/make_docx.py                   # needs pandoc + python-docx
+python slides/make_slides.py                # needs python-pptx + poppler
+python -m pytest -q                         # 36 unit tests
+```
+
+The details of every step are in the phase sections below.
 
 ---
 
@@ -289,6 +352,8 @@ python -c "from src.eval.entities import tune_threshold; tune_threshold()"
 - **A1 vs the LLM drafts** (blind pass): 10/20 agree, κ = 0.19 (3 labels) / 0.21 (binary), 0 revisions. The discarded assisted pass agreed 20/20.
 - **Error types** (A1, A4, A5 only; A2/A3 gave none): 21 of 34 error summaries have a type, 14 of them *meaning* (correct names/numbers in a wrong relation).
 - **No metric agrees with the humans.** AUC, faithful vs error (95% bootstrap CI): NLI chunk 0.49 (0.34-0.64), NLI window 0.39 (0.24-0.55), ROUGE-L 0.60 (0.45-0.75), BERTScore 0.58 (0.43-0.72), entity P 0.52; number P is 1.0 on every labelled summary with a number. **Neither NLI variant is chosen as primary.**
+- **Without A1** (`agreement.py --without A1`; 50 summaries): error rate 62%, all AUC intervals still include 0.5, so the conclusions do not change.
+- **Disagreement is about severity:** of 45 disagreeing annotator pairs on shared rows, 24 are faithful vs minor, 17 minor vs major, 4 faithful vs major.
 
 ### Model comparison: gpt-oss-120b vs gemma3:4b (same 50 articles)
 
@@ -352,7 +417,9 @@ cd paper && tectonic main.tex         # paper/main.pdf (IEEEtran); see paper/REA
 - **CMI vs recall:** for `hinglish`, number recall rises slightly with CMI (ρ = 0.17 / 0.18 for plain / factual, p ≈ 0.03). Entity recall shows no trend.
   - As a control, the Devanagari (`hi`) summaries of the same articles show the same direction more weakly (ρ = 0.09 / 0.13, not significant).
   - So part of the effect comes from the articles themselves, not from code-mixing, and there is no sign that more mixing hurts.
-- **Paper status:** all sections are written with the final numbers. Remaining TODOs: author block, repository URL, annotator background.
+- **Paper:** complete, no TODOs. `paper/FactIndic_IEEE.pdf` is built from LaTeX (tectonic/XeTeX; Devanagari set in the bundled Noto Serif Devanagari font, SIL OFL).
+- **Word version:** `python paper/make_docx.py` converts the LaTeX with pandoc (IEEE reference style, `paper/ieee.csl`) and applies the IEEE template layout (Letter, two 3.5" columns, Times New Roman 10 pt, IEEE headings and captions). Fix by hand in Word: run-in paragraph headings (`a) Labels:`) are on their own line; figure/caption positions and page breaks; inline math is set in Cambria Math; to submit on the official IEEE template, paste the text into it with *Keep Text Only* and re-apply its styles.
+- **Slides:** `python slides/make_slides.py` builds the 8-slide 16:9 deck with speaker notes, re-rendering the figures at 400 dpi into `slides/figures/`.
 
 ---
 
@@ -365,13 +432,18 @@ FactIndic/
 │   └── processed/       # Paired Hindi and synthetic Hinglish datasets
 ├── docs/                # Project briefs and documentation
 ├── notebooks/           # Interactive exploration and data analysis
-├── paper/               # IEEE formatted research paper LaTeX files
+├── paper/               # IEEE paper: main.tex, sections/, figures/, FactIndic_IEEE.pdf/.docx, make_docx.py
+├── slides/              # FactIndic_presentation.pptx + make_slides.py
 ├── prompts/             # Plain and factuality-aware prompt templates
 ├── results/             # Evaluation scores, CSV files, and charts
 ├── src/
-│   ├── __init__.py
-│   ├── llm_client.py    # Unified API client (Gemini/Groq) with backoff & latency
-│   └── smoke_test.py    # End-to-end smoke test script
+│   ├── data/            # XL-Sum loading, Hinglish generation and checks, romanization
+│   ├── eval/            # metrics, annotation tools, merge, agreement
+│   ├── analysis/        # paper figures
+│   ├── summarize.py     # summaries (Ollama / Groq), resumable
+│   ├── evaluate.py      # all automatic metrics, bootstrap CIs
+│   ├── llm_client.py    # unified API client with backoff & latency
+│   └── smoke_test.py    # end-to-end smoke test
 ├── tests/               # Automated unit tests (pytest)
 ├── .env.example         # Template environment configuration
 ├── .gitignore           # Git ignore rules for Python, datasets, and secrets
@@ -384,14 +456,14 @@ FactIndic/
 
 ## 🗺️ Project Roadmap
 
-- **Phase 1: Setup & Foundations** *(Current)* — Directory layout, unified LLM client, rate-limit exponential backoff, smoke tests.
-- **Phase 2: Data Acquisition** — Curate ~300 Hindi articles from XL-Sum and generate aligned Hinglish code-mixed variants.
-- **Phase 3: Summarization Experiments** — Plain prompts vs. Factuality-aware prompts across Hindi and Hinglish.
-- **Phase 4: Fact-Checking Evaluation** — Entity/numerical precision-recall-F1 (Stanza + regex) and NLI entailment scores (`mDeBERTa-v3-base-xnli`).
-- **Phase 5: Results Analysis** — Comprehensive comparative tables, error analysis, and hallucination breakdown visualizations.
-- **Phase 6: Deliverables** — Final IEEE conference paper and viva presentation slides.
+All phases are complete (release `v1.0`).
+- **Phase 1: Setup** — directory layout, unified LLM client with backoff, smoke test.
+- **Phase 2: Data** — 186 XL-Sum Hindi articles, Hinglish rewrites with fact checks, Romanized versions.
+- **Phase 3: Summarization** — gemma3:4b (1,116 summaries) and gpt-oss-120b (200), plain vs factual prompt.
+- **Phase 4: Evaluation** — number/entity P/R, NLI, ROUGE, BERTScore, wrong-language check; five-annotator human labels.
+- **Phase 5: Analysis and deliverables** — figures, IEEE paper (PDF + Word), 8-slide presentation.
 
-For detailed descriptions of each phase, see [PROJECT.md](file:///Users/as/Desktop/FactIndic/PROJECT.md).
+For detailed descriptions of each phase, see [PROJECT.md](PROJECT.md).
 
 ---
 
@@ -400,7 +472,7 @@ For detailed descriptions of each phase, see [PROJECT.md](file:///Users/as/Deskt
 1. **Why not fine-tune a model?**
    Fine-tuning small multilingual models (like mBART or mT5) requires substantial domain-specific hallucination datasets and high-compute training. Evaluating zero-shot / few-shot factuality-aware prompting on modern foundation LLMs reflects real-world API-based deployments and tests whether prompt engineering can enforce grounding.
 2. **How does code-mixing (Hinglish) affect factuality?**
-   Hinglish lacks standardized spelling and grammar. Subword tokenizers often fragment Hinglish words into unnatural sub-tokens, increasing the risk of entity corruption and hallucination.
+   Less than expected in the automatic metrics: recall differences between conditions are small next to the prompt effect, and more code-mixing (higher CMI) does not lower recall. The clearest effect is on *language control*: the small model answers Hinglish articles in English in up to 9.1% of cases. Humans marked 15/20 Hinglish summaries as wrong vs 10/20 Hindi, but with 20 per group that difference is not significant.
 3. **What makes the evaluation pipeline robust?**
-   Traditional ROUGE and BLEU only measure n-gram overlap with reference summaries (which themselves may omit source facts). Our pipeline combines **symbolic verification** (exact entity & numerical matching) with **deep semantic verification** (cross-lingual NLI entailment).
+   Number and entity checks work across scripts (parsed number values, phonetic name matching), so they can be compared between Hindi, Romanized Hindi and Hinglish. But the human labels show their limit: they catch invented names and numbers, while most real errors are relations between correct facts, which neither they nor NLI detect (all AUCs include 0.5).
 

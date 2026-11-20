@@ -8,7 +8,7 @@ gemma3:4b runs locally through Ollama (v0.40.4) on an Apple M3 laptop with 8\,GB
 All metrics run locally on the same laptop (Apple MPS/CPU) without API calls, using Stanza 1.15, Transformers 5.23, PyTorch 2.15, bert-score 0.3.13 and rouge-score 0.1.2. Means are reported with 95\% percentile-bootstrap confidence intervals (1,000 resamples, seed 42). Model comparisons use only the (article, condition, prompt) combinations for which \emph{both} models produced a summary in the right language (188 of 200), so that both are scored on identical inputs.
 
 \paragraph{Human annotation}
-\todo{Annotator background (five students, native or fluent Hindi speakers, all read Hinglish); time per item.} Each annotator sees the source and summary side by side, with names and numbers highlighted, and labels 20 summaries (the 10 shared ones mixed in random order with their own 10). Annotators A2--A5 use an offline page that shows only the source and the summary.
+The annotators are the five authors, undergraduate computer science students. Each labelled 20 summaries in about 30--40 minutes (roughly 1.5--2 minutes per item). Each annotator sees the source and summary side by side, with names and numbers highlighted, and labels 20 summaries (the 10 shared ones mixed in random order with their own 10). Annotators A2--A5 use an offline page that shows only the source and the summary.
 
 Annotator A1 also had access to suggestion labels written by an LLM (Claude, not one of the evaluated models), each with a quoted justification. To keep A1's labels independent of these suggestions, A1 followed a \emph{blind-first} protocol enforced by the labelling tool:
 \begin{enumerate}
