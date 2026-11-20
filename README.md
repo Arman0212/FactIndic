@@ -13,7 +13,11 @@
 - **Models:** gemma3:4b run locally with Ollama (all 186 articles, 1,116 summaries) and gpt-oss-120b on Groq (50 articles, 200 summaries), each with a *plain* and a *factuality-aware* prompt.
 - **Evaluation:** script-independent number and entity precision/recall, SummaC-style NLI (two variants), ROUGE, BERTScore, a wrong-language check, and 60 summaries labelled by five annotators.
 
-**Paper:** [`paper/FactIndic_IEEE.pdf`](paper/FactIndic_IEEE.pdf) (IEEE, LaTeX) · Word version [`paper/FactIndic_IEEE.docx`](paper/FactIndic_IEEE.docx) · **Slides:** [`slides/FactIndic_presentation.pptx`](slides/FactIndic_presentation.pptx)
+## 📦 Deliverables
+
+- **IEEE Research Paper (PDF):** [`paper/FactIndic_IEEE.pdf`](paper/FactIndic_IEEE.pdf) — Two-column camera-ready IEEE formatted paper.
+- **IEEE Research Paper (Word):** [`paper/FactIndic_IEEE.docx`](paper/FactIndic_IEEE.docx) — Word version formatted to IEEE conference specifications.
+- **Presentation Slides:** [`slides/FactIndic_presentation.pptx`](slides/FactIndic_presentation.pptx) — 8-slide 16:9 presentation deck with speaker notes.
 
 ### Results in brief
 
