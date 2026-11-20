@@ -47,6 +47,7 @@ results/*.parquet
 !results/summary_table_*.csv
 !results/manual_annotation.csv
 !results/entity_threshold_tuning.csv
+!results/model_comparison.csv
 
 # NLP model cache & Hugging Face downloads
 stanza_resources/

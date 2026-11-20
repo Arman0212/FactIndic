@@ -203,7 +203,7 @@ Mean summary length (summaries that passed the script check; compression = summa
 | `hinglish` | 83.3 words (0.322) | 87.5 words (0.344) |
 
 - The mean latency is 10.1 s per summary on an 8 GB Mac, for a total of 3.1 h.
-- The `openai/gpt-oss-120b` comparison (50 articles, `hi` + `hinglish` only) is **in progress**: 16 of 200 summaries so far, limited by Groq's daily token quota.
+- The `openai/gpt-oss-120b` comparison (50 articles, `hi` + `hinglish` only) is **complete**: 200 of 200 summaries, with **0** in the wrong language or script. Results are in *Evaluation → Model comparison* below.
 
 ---
 
@@ -218,6 +218,8 @@ python -m src.eval.make_annotation_packs            # split across 5 annotators 
 python -m src.eval.label_server                     # A1's labelling page at http://127.0.0.1:8765
 python -m src.eval.merge_annotations                # merge 5 label files, Fleiss/Cohen kappa
 python -m src.eval.agreement                        # then: metrics vs final human labels
+python -m src.evaluate --model openai/gpt-oss-120b  # score the 200 Groq summaries
+python -m src.eval.compare_models                   # gpt-oss-120b vs gemma3:4b -> results/model_comparison.csv
 python -c "from src.eval.entities import tune_threshold; tune_threshold()"
 ```
 
@@ -273,6 +275,35 @@ python -c "from src.eval.entities import tune_threshold; tune_threshold()"
   - With 2-sentence windows, the two prompts score about the same.
   - One possible explanation (not tested) is that factual summaries pack more facts into each sentence, which long-premise NLI penalizes.
   - The primary NLI variant will be chosen by agreement with the manual labels (`src/eval/agreement.py`, point-biserial r and AUC against faithful-vs-error labels).
+
+### Model comparison: gpt-oss-120b vs gemma3:4b (same 50 articles)
+
+`openai/gpt-oss-120b` (Groq) was run on only 50 articles and two conditions, so both models are compared on exactly those (article, condition, prompt) rows (`src/eval/compare_models.py` → `results/model_comparison.csv`).
+- The wrong-language rate is computed over all 50 summaries per cell.
+- All other columns are means over the rows where **both** models passed the language check (n), so both models are scored on the same inputs.
+- Num P averages only the summaries that contain numbers.
+
+| Condition | Prompt | Model | Wrong lang | n | Num P | Num R | Ent P | Ent R | NLI chunk | NLI window | ROUGE-L src | BERTScore | Words | Latency (s) |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| hi | plain | gemma3:4b | 0% | 50 | 0.926 | 0.197 | 0.985 | 0.461 | 0.729 | 0.739 | 0.212 | 0.752 | 75.3 | 7.4 |
+| hi | plain | gpt-oss-120b | 0% | 50 | 0.958 | 0.465 | 0.987 | 0.543 | 0.669 | 0.624 | 0.223 | 0.764 | 76.2 | 5.0 |
+| hi | factual | gemma3:4b | 0% | 50 | 0.987 | 0.499 | 1.000 | 0.657 | 0.625 | 0.721 | 0.297 | 0.788 | 78.2 | 8.2 |
+| hi | factual | gpt-oss-120b | 0% | 50 | 0.996 | 0.651 | 0.980 | 0.729 | 0.566 | 0.643 | 0.382 | 0.799 | 96.2 | 5.6 |
+| hinglish | plain | gemma3:4b | 10% | 45 | 0.994 | 0.311 | 0.962 | 0.590 | 0.576 | 0.623 | 0.312 | 0.743 | 82.7 | 8.8 |
+| hinglish | plain | gpt-oss-120b | 0% | 45 | 1.000 | 0.457 | 0.987 | 0.605 | 0.510 | 0.545 | 0.309 | 0.740 | 82.8 | 5.6 |
+| hinglish | factual | gemma3:4b | 14% | 43 | 1.000 | 0.504 | 0.996 | 0.675 | 0.445 | 0.642 | 0.428 | 0.777 | 87.0 | 9.7 |
+| hinglish | factual | gpt-oss-120b | 0% | 43 | 1.000 | 0.660 | 1.000 | 0.742 | 0.422 | 0.569 | 0.429 | 0.779 | 99.1 | 6.2 |
+
+**Observations**
+- **Language control:** gpt-oss-120b never answered in the wrong language or script. gemma3:4b did so for 10-14% of Hinglish summaries.
+- **gpt-oss-120b covers more facts.** Number recall is higher in every cell (`hi` / plain: 0.20 → 0.47), and entity recall is higher too.
+- **Precision is at the ceiling for both models** (≥ 0.93 numbers, ≥ 0.96 entities), so these metrics barely separate the models.
+- **NLI favours gemma3:4b in every cell and in both variants** (e.g. window NLI for `hi` / plain: 0.74 vs 0.62). This does not by itself mean gpt-oss-120b hallucinates more:
+  - its summaries carry more facts per sentence, and for `factual` they are longer (96 vs 78 words for `hi`);
+  - the plain-vs-factual comparison above shows that NLI penalises denser summaries.
+  - Whether NLI or the number and entity metrics is right here is a question for the manual labels (`agreement.py`).
+- **Latency is not a speed comparison.** gemma3:4b ran locally on an 8 GB Mac. gpt-oss-120b ran on Groq's servers, and its time includes the network and the model's hidden reasoning tokens.
+- These are 43-50 summaries per cell with no confidence intervals, so read small differences (ROUGE, BERTScore, precision) as ties.
 
 ### Limitations: read before comparing numbers
 

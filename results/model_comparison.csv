@@ -1,0 +1,9 @@
+condition,prompt_type,model,n_articles,wrong_language_pct,n_scored,n_num,num_p,num_r,ent_p,ent_r,nli_chunk_score,nli_window_score,rougeL_src,bertscore_src,summary_words,latency_s
+hi,factual,gemma3:4b,50,0.0,50,38,0.987,0.499,1.0,0.657,0.625,0.721,0.297,0.788,78.22,8.16
+hi,factual,openai/gpt-oss-120b,50,0.0,50,43,0.996,0.651,0.98,0.729,0.566,0.643,0.382,0.799,96.24,5.625
+hi,plain,gemma3:4b,50,0.0,50,27,0.926,0.197,0.985,0.461,0.729,0.739,0.212,0.752,75.3,7.427
+hi,plain,openai/gpt-oss-120b,50,0.0,50,36,0.958,0.465,0.987,0.543,0.669,0.624,0.223,0.764,76.2,4.972
+hinglish,factual,gemma3:4b,50,14.0,43,35,1.0,0.504,0.996,0.675,0.445,0.642,0.428,0.777,86.953,9.74
+hinglish,factual,openai/gpt-oss-120b,50,0.0,43,37,1.0,0.66,1.0,0.742,0.422,0.569,0.429,0.779,99.14,6.236
+hinglish,plain,gemma3:4b,50,10.0,45,27,0.994,0.311,0.962,0.59,0.576,0.623,0.312,0.743,82.711,8.754
+hinglish,plain,openai/gpt-oss-120b,50,0.0,45,31,1.0,0.457,0.987,0.605,0.51,0.545,0.309,0.74,82.778,5.579
