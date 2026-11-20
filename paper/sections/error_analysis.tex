@@ -1,20 +1,23 @@
 \section{Error Analysis}
 \label{sec:errors}
 
-% OUTLINE - depends on the merged human labels (results/manual_annotation.csv).
+\paragraph{Error types} Error types were given by three of the five annotators (A1, A4, A5; A2 and A3 gave labels only), so 21 of the 34 erroneous summaries have a final type (Fig.~\ref{fig:errortypes}b). \emph{Meaning} errors, in which correct names and numbers are put in a wrong relation, dominate: 14 of 21 final types, and 22 of the 32 typed error labels of the three annotators. Omissions that make a summary misleading follow (4 of 21); number, entity and added-information errors occur once each. This matches the automatic results: invented names and numbers are rare, so the precision metrics are at the ceiling, while the errors humans find are about relations. Thirty-three of the 34 erroneous summaries have perfect number and entity precision.
 
-\todo{Write this section after the human labels are merged.}
-
+\paragraph{Relation errors that the automatic metrics pass} The three major errors below were labelled by the annotators; each has number and entity precision 1.0 (or no number), and each passes NLI-window.
 \begin{itemize}
-  \item \todo{Distribution of error types (entity / number / added\_info / meaning / omission / other) per condition and prompt.}
-  \item \textbf{Relation (``meaning'') errors that every automatic metric passes.} Candidate examples already found while building the pipeline (confirm with the final labels):
-  \begin{itemize}
-    \item Dreamliner (\cond{hi}, plain): the summary dates the launch of the Dreamliner to 1995, whereas the source gives 1995 as the launch of the Boeing 777. Number precision 1.0, entity precision 1.0, NLI 0.86.
-    \item Paes: the summary turns his 20th US Open \emph{appearance} into a 20th \emph{title}.
-    \item \todo{2--3 more examples from the labelled set, e.g.\ role reversals (who condemned whom), outcome reversals (abandoned match reported as a win).}
-  \end{itemize}
-  \item \textbf{Number errors}: rounding (``over 2 lakh'' for 2 lakh 30 thousand), number words vs.\ digits. \todo{counts.}
-  \item \textbf{Entity errors}: added first names (a surname-only source name expanded), transliteration variants. \todo{counts.}
-  \item \textbf{Code-mixing artifacts}: translation of English words in Hinglish summaries; switch to English. \todo{examples.}
-  \item \textbf{Metric failure cases}: summaries the metrics flag but humans judge faithful (e.g.\ number parser reading the surname ``Das'' as 10). \todo{from agreement analysis.}
+  \item \emph{Outcome reversal} (\cond{hinglish}, plain): a rain-shortened England--Pakistan ODI was abandoned with Pakistan on 46 for 1, but the summary says ``Pakistan ne 46 run mein ek wicket loss ke saath match jeeta'' (Pakistan won the match). NLI-window 0.80, NLI-chunk 0.28.
+  \item \emph{Outcome reversal} (\cond{hinglish}, plain): an India--England Test was drawn with India on 391/9, but the summary says India ``England ko khatam kar diya'' (finished England off), although all scores, Root's 154 and Anderson's man-of-the-match award are copied correctly. NLI-window 0.75, NLI-chunk 0.28.
+  \item \emph{Role reversal} (\cond{hi-rom}, factual): in the source, George Fernandes supports the vegetable vendors protesting against Reliance and condemns the police brutality against them; the summary says he \emph{supported} the police's brutal treatment of the vendors and attributes to him an assurance of full protection for Reliance Fresh that, in the source, was given by the Chief Minister. NLI-window 0.66, NLI-chunk 0.52.
 \end{itemize}
+The same pattern appears outside the labelled set. In a \cond{hi} plain summary, gemma3:4b writes that Boeing launched the Dreamliner in 1995; the source gives 1995 as the launch year of the Boeing 777. Both the number and the name occur in the source, so number and entity precision are 1.0, and NLI scores the summary 0.76 (chunk) and 0.82 (window).
+
+\paragraph{Errors that the precision metrics do catch} The few non-relation errors are caught by the script-independent checks. A \cond{hi-rom} plain summary says ``char lakh'' (4 lakh) children run away from home every year, where the source has 4 lakh 40 thousand; the parsed values differ, so number precision drops to 0.86. A \cond{hi} plain summary of the India--England Test writes the full name ``James Anderson'' (in Devanagari) where the source names only ``Anderson''; the first name is correct world knowledge but not in the article, and entity precision drops to 0.83. Under our guidelines both count as errors, the second as added information.
+
+\paragraph{Metric failure cases} Number words in Roman script need exact word lists. Twelve is written \emph{barah} by our transliterator but also \emph{baarah} by people, and the parser recognizes only the listed spelling; fuzzy matching is not an option, because \emph{barh} (``rising'', the transliteration of a common Hindi verb) is one edit away. Similarly, the surname ``Das'' is read as 10 (\emph{das}). In the labelled set, however, the precision metrics never flagged a faithful summary; the main failure is the opposite one, missed relation errors. NLI fails in both directions: NLI-window passes 31 of 34 erroneous summaries, and NLI-chunk scores 13 of 26 faithful summaries below 0.5.
+
+\begin{figure}[t]
+  \centering
+  \includegraphics[width=\columnwidth]{fig_error_types}
+  \caption{(a) Final human label of the 60 labelled gemma3:4b summaries (10 per condition and prompt; P = plain, F = factual). (b) Error type of the erroneous summaries that have one (typed / all errors above each bar); two of the five annotators gave no error types.}
+  \label{fig:errortypes}
+\end{figure}

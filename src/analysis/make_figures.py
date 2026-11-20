@@ -16,8 +16,13 @@ palette, plus hatching so the bars also work in black and white.
                                 passed the language check), 95% bootstrap CI
   fig_cmi_recall            (d) per-article recall vs CMI, hinglish condition,
                                 scatter + least-squares line + Spearman rho
-  fig_agreement             placeholder: metric vs human labels (needs the
-                                merged annotation; TODO)
+  fig_agreement             (e) AUC of each automatic metric against the
+                                human label (faithful vs error), 60 summaries,
+                                95% bootstrap CI (from results/metric_agreement.csv,
+                                written by src.eval.agreement)
+  fig_error_types           (f) final human labels per condition x prompt, and
+                                the error types of the error summaries that
+                                have one (A2/A3 gave no types; n printed)
 
 Also writes paper/figures/cmi_correlations.csv: Spearman rho for (d), plus the
 same correlation for the hi condition as a CONTROL. CMI describes the
@@ -220,12 +225,106 @@ def fig_cmi_recall():
     print(stats.to_string(index=False))
 
 
-# ---------------------------------------------------------------- placeholder
+# ---------------------------------------------------------------- (e)
+METRIC_NAMES = {"nli_chunk_score": "NLI chunk", "nli_window_score": "NLI window", "num_p": "Number P",
+                "ent_p": "Entity P", "rougeL_src": "ROUGE-L", "bertscore_src": "BERTScore"}
+AGREEMENT_PATH = Path("results/metric_agreement.csv")
+ANNOTATION_PATH = Path("results/manual_annotation.csv")
+
+
 def fig_agreement():
-    """TODO (after src.eval.merge_annotations): one bar per metric with the AUC
-    (faithful vs error) and its bootstrap CI, from src.eval.agreement. Not drawn
-    yet: it needs the human labels. The paper shows a framed placeholder."""
-    print("  fig_agreement: skipped (needs merged human labels - TODO)")
+    """One dot per metric: AUC (faithful vs any error) with its 95% bootstrap
+    CI. 0.5 = chance. Run src.eval.agreement first."""
+    if not AGREEMENT_PATH.exists():
+        print("  fig_agreement: skipped (run python -m src.eval.agreement first)")
+        return
+    agr = pd.read_csv(AGREEMENT_PATH).iloc[::-1]  # first metric at the top
+    fig, ax = plt.subplots(figsize=(COL_WIDTH, 1.75))
+    y = np.arange(len(agr))
+    ax.axvline(0.5, color="0.5", lw=0.6, ls="--", zorder=1)
+    ax.text(0.51, -0.8, "chance", ha="left", va="center", fontsize=6, color="0.4")
+    for yi, (_, r) in zip(y, agr.iterrows()):
+        nli = r["metric"].startswith("nli")
+        ax.plot([r["auc_lo"], r["auc_hi"]], [yi, yi], color="black", lw=0.8, zorder=2)
+        ax.plot(r["auc"], yi, "o", ms=4.5, zorder=3, mec="black", mew=0.5,
+                color=COLORS["plain"] if nli else "white")
+        note = "constant" if r.get("note") == "constant" else f"{r['auc']:.2f}"
+        ax.text(0.97, yi, f"{note}  (n={int(r['n'])})", ha="right", va="center", fontsize=6,
+                transform=ax.get_yaxis_transform())
+    ax.set_yticks(y)
+    ax.set_yticklabels([METRIC_NAMES[m] for m in agr["metric"]])
+    ax.set_xlim(0.2, 1.0)
+    ax.set_ylim(-1.0, len(agr) - 0.4)
+    ax.set_xlabel("AUC, faithful vs. error (95% bootstrap CI)")
+    fig.tight_layout()
+    save(fig, "fig_agreement")
+
+
+# ---------------------------------------------------------------- (f)
+LABEL_ORDER = ["faithful", "minor_error", "major_error"]
+LABEL_NAMES = {"faithful": "faithful", "minor_error": "minor error", "major_error": "major error"}
+# severity is ordered, so one hue from light to dark (grey = no error)
+LABEL_COLORS = {"faithful": "#DDDDDD", "minor_error": "#F5B65C", "major_error": "#B85C00"}
+TYPE_ORDER = ["meaning", "omission", "number", "entity", "added_info", "other"]
+TYPE_NAMES = {"meaning": "meaning", "omission": "omission", "number": "number", "entity": "entity",
+              "added_info": "added info", "other": "other"}
+TYPE_COLORS = {"meaning": "#0072B2", "omission": "#E69F00", "number": "#009E73", "entity": "#CC79A7",
+               "added_info": "#56B4E9", "other": "#999999"}  # Okabe-Ito, fixed order
+
+
+def stacked(ax, groups: list, parts: list, counts: dict, colors: dict, names: dict):
+    """Stacked bars: counts[(group, part)] = n, a white gap between segments."""
+    bottom = np.zeros(len(groups))
+    for part in parts:
+        vals = np.array([counts.get((g, part), 0) for g in groups])
+        if vals.sum() == 0:
+            continue
+        ax.bar(np.arange(len(groups)), vals, 0.75, bottom=bottom, color=colors[part],
+               edgecolor="white", linewidth=0.8, label=names[part])
+        bottom += vals
+    return bottom
+
+
+def fig_error_types():
+    ann = read_csv_str(ANNOTATION_PATH)
+    ann = ann[ann["label"] != ""]
+    cells = [(c, p) for c in CONDITIONS for p in PROMPTS]
+    fig, axes = plt.subplots(1, 2, figsize=(COL_WIDTH, 2.55), sharey=False)
+
+    lab = ann.groupby(["condition", "prompt_type", "label"]).size()
+    counts = {((c, p), l): int(lab.get((c, p, l), 0)) for c, p in cells for l in LABEL_ORDER}
+    stacked(axes[0], cells, LABEL_ORDER, counts, LABEL_COLORS, LABEL_NAMES)
+    axes[0].set_title(f"(a) Human label (n={len(ann)})", pad=26)
+    axes[0].set_ylabel("Summaries")
+    axes[0].set_ylim(0, 10.5)
+
+    err = ann[ann["label"] != "faithful"]
+    typed = err[err["error_type"] != ""]
+    typ = typed.groupby(["condition", "prompt_type", "error_type"]).size()
+    counts = {((c, p), t): int(typ.get((c, p, t), 0)) for c, p in cells for t in TYPE_ORDER}
+    top = stacked(axes[1], cells, TYPE_ORDER, counts, TYPE_COLORS, TYPE_NAMES)
+    n_err = err.groupby(["condition", "prompt_type"]).size()
+    for x, (cell, h) in enumerate(zip(cells, top)):  # "typed / all errors" above each bar
+        axes[1].text(x, h + 0.15, f"{int(h)}/{int(n_err.get(cell, 0))}", ha="center", va="bottom", fontsize=5.5)
+    axes[1].set_title(f"(b) Error type ({len(typed)}/{len(err)} typed)", pad=26)
+    axes[1].set_ylim(0, 10.5)
+
+    short = {"hi": "Hindi", "hi_roman": "Rom.", "hinglish": "Hingl."}
+    for ax in axes:
+        # prompt under each bar (P = plain, F = factual), condition under each pair
+        ax.set_xticks(np.arange(len(cells)))
+        ax.set_xticklabels(["P" if p == "plain" else "F" for _, p in cells], fontsize=6)
+        for k, c in enumerate(CONDITIONS):
+            ax.text(2 * k + 0.5, -0.17, short[c], ha="center", va="top", fontsize=6.5,
+                    transform=ax.get_xaxis_transform())
+        ax.legend(frameon=False, loc="lower center", bbox_to_anchor=(0.5, 1.06), ncol=3, fontsize=5.5,
+                  handlelength=0.8, handletextpad=0.3, columnspacing=0.5, labelspacing=0.2, borderaxespad=0)
+    fig.tight_layout(w_pad=0.5)
+    save(fig, "fig_error_types")
+
+
+def read_csv_str(path: Path) -> pd.DataFrame:
+    return pd.read_csv(path, encoding="utf-8-sig", dtype=str, keep_default_na=False)
 
 
 def main():
@@ -235,6 +334,7 @@ def main():
     fig_model_recall()
     fig_cmi_recall()
     fig_agreement()
+    fig_error_types()
 
 
 if __name__ == "__main__":

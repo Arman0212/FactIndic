@@ -1,12 +1,10 @@
 \section{Conclusion}
 \label{sec:conclusion}
 
-% OUTLINE
-\todo{Write after Results and Error Analysis.}
+We studied the factual consistency of LLM summaries of the same news articles in Devanagari Hindi, Romanized Hindi and Hinglish, without training any model. For a small local model, the first failure is language control: gemma3:4b answers Hinglish articles in English in up to 9.1\% of cases, and the factuality-aware prompt makes this worse, while a 120B model never fails. Explicit hallucination of names and numbers is rare in all three conditions (precision $\geq 0.97$), and the factuality-aware prompt mainly raises how many of the source's numbers and names are kept. The errors that humans find are of a different kind: 57\% of the 60 labelled summaries contain an error, most of them relation errors such as a reversed match outcome or a reversed role, in which every name and number is copied correctly. Neither our script-independent precision metrics nor multilingual NLI detect these errors; no metric reaches an AUC reliably above 0.5.
 
-\begin{itemize}
-  \item Summary of findings: language control as the first failure mode for a small model on Romanized/Hinglish input; precision at ceiling; factual prompt raises coverage; \todo{human-label headline}.
-  \item What practitioners should measure: wrong-language rate, script-independent number/entity checks, and human labels for relation errors.
-  \item Limitations (synthetic Hinglish, one small and one large model, 60 labelled summaries).
-  \item Future work: naturally occurring Hinglish news, QA-based metrics for code-mixed text, more models.
-\end{itemize}
+For practitioners working with Hindi and Hinglish we suggest three measurements: the wrong-language rate, which is cheap and catches the most frequent failure of small models; script-independent number and entity checks, which catch the rare invented or altered fact; and human labels, which are still needed for relation errors.
+
+\paragraph{Limitations} The Hinglish articles are LLM rewrites rather than naturally occurring text. We evaluate one small and one large model, label 60 summaries of the small model only, and agreement between annotators is only fair, so differences between conditions in the human labels are not significant. Two of the five annotators gave no error types.
+
+\paragraph{Future work} Naturally occurring Hinglish news, question-answering-based metrics that can test relations across scripts, NLI models trained on Romanized and code-mixed Hindi, and more models.

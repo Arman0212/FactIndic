@@ -233,7 +233,7 @@ python -c "from src.eval.entities import tune_threshold; tune_threshold()"
   - A1's first pass, made with the drafts visible, is kept in `labels_A1_assisted.csv` for comparison only. It agreed with the drafts on 20 of 20 labels.
   - `python -m src.eval.draft_agreement` compares the blind labels with the drafts (agreement, Cohen's kappa, confusion matrix, revisions).
 - **A2-A5** label offline in a self-contained page (`A2.html` etc., opened by double-click in Chrome). Labels autosave in the browser, and a button exports `labels_A2.csv`. These pages contain **no LLM draft labels**.
-- **Merge** (`merge_annotations.py`): writes every individual label to `all_labels.csv` and one *final* label per summary to `results/manual_annotation.csv` (columns `set`, `annotator`, `label`, `error_type`, `notes`). Shared rows take the majority label; a tie goes to the more severe label. The script prints Fleiss' kappa (all five) and pairwise Cohen's kappa on the shared rows, for 3 labels and for faithful vs error. `agreement.py` uses these final labels.
+- **Merge** (`merge_annotations.py`): writes every individual label to `all_labels.csv` and one *final* label per summary to `results/manual_annotation.csv` (columns `set`, `annotator`, `label`, `error_type`, `notes`). Shared rows take the majority label; a tie goes to the more severe label. The script prints, for 3 labels and for faithful vs error: Fleiss' kappa on the shared rows labelled by all five, Krippendorff's alpha on all shared rows (it allows a missing rating), and pairwise Cohen's kappa. It also prints error-type counts, only from annotators who gave types. `agreement.py` uses these final labels and adds 95% bootstrap CIs (→ `results/metric_agreement.csv`).
 - **Drafts and anchoring.** `draft_label`, `draft_error_type` and `draft_note` are suggestions written by an LLM (Claude), shown only to A1. `label_source` records how A1's locked blind label relates to the draft (`same_as_draft_blind` / `changed_from_draft_blind`), `blind_pack` for teammates, and `majority` / `majority_tie` for merged shared rows. Labels copied from a draft are not independent human judgments, so report these counts alongside the agreement numbers.
 
 **Outputs**
@@ -280,7 +280,15 @@ python -c "from src.eval.entities import tune_threshold; tune_threshold()"
   - With large chunks, the factual prompt scores *lower* than the plain prompt in every condition (`hi`: 0.74 → 0.61).
   - With 2-sentence windows, the two prompts score about the same.
   - One possible explanation (not tested) is that factual summaries pack more facts into each sentence, which long-premise NLI penalizes.
-  - The primary NLI variant will be chosen by agreement with the manual labels (`src/eval/agreement.py`, point-biserial r and AUC against faithful-vs-error labels).
+  - Neither variant agrees with the human labels (see *Human labels* below), so neither is chosen as the primary metric.
+
+### Human labels (60 gemma3:4b summaries, 5 annotators)
+
+- **Errors are common.** 34 of 60 summaries (57%, 95% Wilson CI 44-68%) contain an error, 12 (20%) a major one. `hinglish` 15/20, `hi` 10/20, `hi_roman` 9/20; plain 19/30, factual 15/30 (not significant at this size).
+- **Agreement is fair** on the 10 shared rows. Fleiss' κ = 0.20 (3 labels) / 0.38 (binary) on the 9 rows all five labelled (A3 left one empty). Krippendorff's α on all 10 = 0.23 / 0.44. Pairwise Cohen's κ (binary) 0.00-0.80; A1 agrees least with the others.
+- **A1 vs the LLM drafts** (blind pass): 10/20 agree, κ = 0.19 (3 labels) / 0.21 (binary), 0 revisions. The discarded assisted pass agreed 20/20.
+- **Error types** (A1, A4, A5 only; A2/A3 gave none): 21 of 34 error summaries have a type, 14 of them *meaning* (correct names/numbers in a wrong relation).
+- **No metric agrees with the humans.** AUC, faithful vs error (95% bootstrap CI): NLI chunk 0.49 (0.34-0.64), NLI window 0.39 (0.24-0.55), ROUGE-L 0.60 (0.45-0.75), BERTScore 0.58 (0.43-0.72), entity P 0.52; number P is 1.0 on every labelled summary with a number. **Neither NLI variant is chosen as primary.**
 
 ### Model comparison: gpt-oss-120b vs gemma3:4b (same 50 articles)
 
@@ -307,7 +315,7 @@ python -c "from src.eval.entities import tune_threshold; tune_threshold()"
 - **NLI favours gemma3:4b in every cell and in both variants** (e.g. window NLI for `hi` / plain: 0.74 vs 0.62). This does not by itself mean gpt-oss-120b hallucinates more:
   - its summaries carry more facts per sentence, and for `factual` they are longer (96 vs 78 words for `hi`);
   - the plain-vs-factual comparison above shows that NLI penalises denser summaries.
-  - Whether NLI or the number and entity metrics is right here is a question for the manual labels (`agreement.py`).
+  - NLI did not agree with the human labels (see below), so this difference should not be read as a faithfulness difference.
 - **Latency is not a speed comparison.** gemma3:4b ran locally on an 8 GB Mac. gpt-oss-120b ran on Groq's servers, and its time includes the network and the model's hidden reasoning tokens.
 - These are 43-50 summaries per cell with no confidence intervals, so read small differences (ROUGE, BERTScore, precision) as ties.
 
@@ -337,12 +345,14 @@ cd paper && tectonic main.tex         # paper/main.pdf (IEEEtran); see paper/REA
   - (a) number and entity recall by condition × prompt;
   - (b) wrong-language rate, gemma3:4b vs gpt-oss-120b;
   - (c) both models' recall on the shared 50-article subset;
-  - (d) per-summary recall vs CMI for `hinglish`, with Spearman ρ.
-- **Style:** all figures are one IEEE column wide and use the Okabe-Ito colour-blind-safe palette with hatching. A placeholder is left for the metric-vs-human agreement figure.
+  - (d) per-summary recall vs CMI for `hinglish`, with Spearman ρ;
+  - (e) AUC of each metric against the human labels, with bootstrap CIs (needs `agreement.py` first);
+  - (f) human label distribution and error types by condition × prompt.
+- **Style:** all figures are one IEEE column wide and use the Okabe-Ito colour-blind-safe palette with hatching.
 - **CMI vs recall:** for `hinglish`, number recall rises slightly with CMI (ρ = 0.17 / 0.18 for plain / factual, p ≈ 0.03). Entity recall shows no trend.
   - As a control, the Devanagari (`hi`) summaries of the same articles show the same direction more weakly (ρ = 0.09 / 0.13, not significant).
   - So part of the effect comes from the articles themselves, not from code-mixing, and there is no sign that more mixing hurts.
-- **Paper status:** Abstract, Introduction, Related Work, Dataset, Method and Experimental Setup are drafted. Results, Error Analysis and Conclusion are outlines with TODOs that wait for the human labels.
+- **Paper status:** all sections are written with the final numbers. Remaining TODOs: author block, repository URL, annotator background.
 
 ---
 

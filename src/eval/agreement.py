@@ -20,13 +20,21 @@ For each metric:
     Computed from the Mann-Whitney U statistic: AUC = U / (n_faithful * n_error).
 
 With only 60 labelled summaries the differences between metrics are
-uncertain; we print n per metric and the p-value of r.
+uncertain, so every r and AUC gets a 95% percentile-bootstrap confidence
+interval: resample the summaries with replacement 1,000 times (seed 42, as for
+the other CIs in the paper), recompute r and AUC, and take the 2.5th and 97.5th
+percentiles. A metric whose AUC interval includes 0.5 is not reliably better
+than chance on this data.
+
+Writes results/metric_agreement.csv (used by src/analysis/make_figures.py).
 
 Run:  python -m src.eval.agreement [--model gemma3:4b]
 """
 
 import argparse
+from pathlib import Path
 
+import numpy as np
 import pandas as pd
 from scipy.stats import mannwhitneyu, pointbiserialr
 
@@ -39,6 +47,37 @@ METRICS = [
     "num_p", "ent_p", "rougeL_src", "bertscore_src",
 ]
 LABELS = {"faithful": 1, "minor_error": 0, "major_error": 0}
+OUT_PATH = Path("results/metric_agreement.csv")
+N_BOOT, SEED = 1000, 42
+
+
+def r_and_auc(y: np.ndarray, x: np.ndarray) -> tuple:
+    """Point-biserial r and AUC (= Mann-Whitney U / (n_pos * n_neg)).
+    If the metric has the same value everywhere, r is undefined (NaN) and the
+    AUC is exactly 0.5 (every faithful/error pair is a tie): no signal."""
+    pos, neg = x[y == 1], x[y == 0]
+    if len(pos) == 0 or len(neg) == 0:
+        return np.nan, np.nan
+    if np.all(x == x[0]):
+        return np.nan, 0.5
+    r = pointbiserialr(y, x)[0]
+    auc = mannwhitneyu(pos, neg).statistic / (len(pos) * len(neg))
+    return r, auc
+
+
+def bootstrap_ci(y: np.ndarray, x: np.ndarray) -> tuple:
+    """95% percentile-bootstrap CIs for r and AUC (resampling summaries)."""
+    rng = np.random.default_rng(SEED)
+    rs, aucs = [], []
+    for _ in range(N_BOOT):
+        idx = rng.integers(0, len(y), len(y))
+        r, auc = r_and_auc(y[idx], x[idx])
+        if not np.isnan(auc):  # skip resamples with only one class
+            aucs.append(auc)
+        if not np.isnan(r):    # ... or with a constant metric
+            rs.append(r)
+    r_ci = np.percentile(rs, [2.5, 97.5]) if rs else [np.nan, np.nan]
+    return r_ci, np.percentile(aucs, [2.5, 97.5])
 
 
 def main():
@@ -62,18 +101,36 @@ def main():
     print(f"{len(data)} labelled summaries: {int(data['faithful'].sum())} faithful, "
           f"{int((data['faithful'] == 0).sum())} with errors\n")
 
-    print(f"{'metric':<18} {'n':>4} {'r_pb':>7} {'p':>7} {'AUC':>6}")
+    print(f"{'metric':<18} {'n':>4} {'r_pb':>7} {'95% CI':>17} {'p':>7} {'AUC':>6} {'95% CI':>15}")
+    rows = []
     for m in METRICS:
         d = data[["faithful", m]].dropna()  # e.g. num_p is NaN without numbers
-        n_pos, n_neg = int(d["faithful"].sum()), int((d["faithful"] == 0).sum())
+        y, x = d["faithful"].to_numpy(int), d[m].to_numpy(float)
+        n_pos, n_neg = int(y.sum()), int((y == 0).sum())
         if n_pos == 0 or n_neg == 0:
             print(f"{m:<18} {len(d):>4}   (needs both faithful and error labels)")
             continue
-        r, p = pointbiserialr(d["faithful"], d[m])
-        u = mannwhitneyu(d.loc[d["faithful"] == 1, m], d.loc[d["faithful"] == 0, m]).statistic
-        auc = u / (n_pos * n_neg)
-        print(f"{m:<18} {len(d):>4} {r:>7.3f} {p:>7.3f} {auc:>6.3f}")
+        r, auc = r_and_auc(y, x)
+        if np.isnan(r):
+            print(f"{m:<18} {len(d):>4}   constant ({x[0]:g}) on all labelled summaries: no signal, AUC = 0.5")
+            rows.append({"metric": m, "n": len(d), "n_faithful": n_pos, "n_error": n_neg, "auc": 0.5,
+                         "auc_lo": 0.5, "auc_hi": 0.5, "note": "constant"})
+            continue
+        p = pointbiserialr(y, x)[1]
+        (r_lo, r_hi), (a_lo, a_hi) = bootstrap_ci(y, x)
+        print(f"{m:<18} {len(d):>4} {r:>7.3f} [{r_lo:6.3f}, {r_hi:6.3f}] {p:>7.3f} {auc:>6.3f} [{a_lo:.3f}, {a_hi:.3f}]")
+        rows.append({"metric": m, "n": len(d), "n_faithful": n_pos, "n_error": n_neg,
+                     "r": r, "r_lo": r_lo, "r_hi": r_hi, "p": p, "auc": auc, "auc_lo": a_lo, "auc_hi": a_hi,
+                     "note": f"{int((x != np.median(x)).sum())} values differ from the median"})
+    pd.DataFrame(rows).to_csv(OUT_PATH, index=False)
+    print(f"\nWrote {OUT_PATH}")
 
+    # extra check: does the metric separate MAJOR errors from faithful?
+    print("\nAUC faithful vs MAJOR errors only (minor errors left out):")
+    for m in METRICS:
+        d = data.loc[data["label"] != "minor_error", ["faithful", m]].dropna()
+        r, auc = r_and_auc(d["faithful"].to_numpy(int), d[m].to_numpy(float))
+        print(f"  {m:<18} n={len(d):>3}  AUC {auc:.3f}")
 
 if __name__ == "__main__":
     main()

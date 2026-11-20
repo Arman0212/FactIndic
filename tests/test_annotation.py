@@ -57,3 +57,13 @@ def test_check_decision_rules():
 def test_compare_with_draft_is_always_blind():
     assert compare_with_draft("faithful", "", "faithful", "") == "same_as_draft_blind"
     assert compare_with_draft("minor_error", "entity", "minor_error", "meaning") == "changed_from_draft_blind"
+
+
+def test_krippendorff_alpha_textbook_example():
+    """Krippendorff (2011), nominal example with missing ratings: alpha = 0.743."""
+    from src.eval.merge_annotations import krippendorff_alpha
+    data = [[1, 1, None, 1], [2, 2, 3, 2], [3, 3, 3, 3], [3, 3, 3, 3], [2, 2, 2, 2], [1, 2, 3, 4],
+            [4, 4, 4, 4], [1, 1, 2, 1], [2, 2, 2, 2], [None, 5, 5, 5], [None, None, 1, 1], [None, None, 3, None]]
+    items = [[x for x in row if x is not None] for row in data]
+    assert round(krippendorff_alpha(items), 3) == 0.743
+    assert krippendorff_alpha([["a", "a"], ["b", "b"]]) == 1.0

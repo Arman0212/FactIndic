@@ -1,47 +1,31 @@
 \section{Results}
 \label{sec:results}
 
-% OUTLINE - figures and tables below are final (automatic metrics only);
-% the prose is still to be written. Numbers: results/summary_table_*.csv,
-% results/model_comparison.csv, paper/figures/cmi_correlations.csv.
+% Numbers: results/summary_table_*.csv, results/model_comparison.csv,
+% paper/figures/cmi_correlations.csv, results/metric_agreement.csv and the
+% output of src.eval.merge_annotations / src.eval.draft_agreement.
 
-\todo{Write this section from the outline below.}
+\subsection{Language control}
+gemma3:4b answered in the wrong language or script in 33 of 1,116 summaries (3.0\%, Fig.~\ref{fig:wronglang}). It never failed on \cond{hi}; on \cond{hi-rom} it failed in 0\% of plain and 3.2\% of factual summaries, and on \cond{hinglish} in 5.4\% and 9.1\%. Twenty-seven of the 33 failures are English summaries of Hinglish articles. The factual prompt, whose rules are written in English, increases language switching in both Roman-script conditions. gpt-oss-120b produced no wrong-language summary (0/200).
 
-\subsection{Language control (Fig.~\ref{fig:wronglang})}
-\begin{itemize}
-  \item gemma3:4b: 33/1,116 (3.0\%) wrong language/script; 0\% for \cond{hi}; \cond{hi-rom} 0\% plain vs.\ 3.2\% factual; \cond{hinglish} 5.4\% plain vs.\ 9.1\% factual. 27 of 33 are English summaries of Hinglish articles.
-  \item The factual prompt increases language switching in both Roman-script conditions.
-  \item gpt-oss-120b: 0/200 on the 50-article subset.
-\end{itemize}
+\subsection{Faithfulness by condition and prompt}
+Number and entity precision are at least 0.97 in every cell (Table~\ref{tab:main}): gemma3:4b rarely writes a number or a name that is not in the article. The factual prompt raises recall in every condition (Fig.~\ref{fig:recall}); number recall rises from 0.23 to 0.56 for \cond{hi}, from 0.39 to 0.51 for \cond{hi-rom} and from 0.35 to 0.52 for \cond{hinglish}, and entity recall rises in the same way. Differences between conditions are small compared with this prompt effect; plain-prompt number recall is lowest for \cond{hi}. The two NLI variants disagree on the prompt effect: NLI-chunk scores factual summaries lower in every condition, NLI-window scores them about equal. Section~\ref{sec:human} shows that neither variant agrees with the human labels, so we do not interpret this difference.
 
-\subsection{Faithfulness by condition and prompt (Table~\ref{tab:main}, Fig.~\ref{fig:recall})}
-\begin{itemize}
-  \item Number and entity precision $\geq 0.97$ in every cell: explicit invention of names/numbers is rare.
-  \item Factual prompt raises recall in every condition (number recall \cond{hi} 0.23$\to$0.56).
-  \item Script and code-mixing: recall differences across conditions are small compared with the prompt effect; plain-prompt number recall is lowest for \cond{hi}.
-  \item NLI chunk vs.\ window disagree on the prompt effect (chunk: factual lower; window: about equal) \todo{resolve with human agreement}.
-\end{itemize}
+\subsection{Model comparison}
+On the same 50 articles, gpt-oss-120b has higher number and entity recall than gemma3:4b in all four cells (Table~\ref{tab:models}, Fig.~\ref{fig:models}); precision is at the ceiling for both. NLI favours gemma3:4b in every cell, but gpt-oss-120b's summaries are longer and denser (96 vs.\ 78 words for \cond{hi} factual), and NLI did not track human judgments on our data. Latency is not comparable (a local laptop vs.\ a hosted API).
 
-\subsection{Model comparison (Table~\ref{tab:models}, Fig.~\ref{fig:models})}
-\begin{itemize}
-  \item gpt-oss-120b has higher number and entity recall in all four cells; precision at ceiling for both.
-  \item NLI favours gemma3:4b in every cell; gpt-oss summaries are denser/longer (96 vs.\ 78 words, \cond{hi} factual), see NLI caveat.
-  \item Latency is not comparable (local laptop vs.\ hosted API).
-\end{itemize}
+\subsection{Effect of the amount of code-mixing}
+In the \cond{hinglish} condition, number recall correlates weakly and positively with the article's CMI (Spearman $\rho = 0.17$ plain, $0.18$ factual, $p \approx 0.03$; Fig.~\ref{fig:cmi}); entity recall does not. On the Devanagari version of the same articles the correlation is weaker and not significant ($\rho = 0.09$/$0.13$), so part of the effect comes from the articles themselves. We find no evidence that more code-mixing lowers recall.
 
-\subsection{Effect of the amount of code-mixing (Fig.~\ref{fig:cmi})}
-\begin{itemize}
-  \item \cond{hinglish}: weak positive Spearman correlation between CMI and number recall ($\rho = 0.17$/$0.18$, $p \approx 0.03$), none for entity recall.
-  \item Control: same correlation on the \cond{hi} version of the same articles is weaker and not significant ($\rho = 0.09$/$0.13$) $\Rightarrow$ part of the effect is article content, not mixing; no evidence that more mixing hurts.
-\end{itemize}
+\subsection{Human judgments and metric agreement}
+\label{sec:human}
+\paragraph{Labels} Of the 60 labelled gemma3:4b summaries, 34 (57\%, 95\% Wilson CI 44--68\%) contain at least one error and 12 (20\%) a major error (Fig.~\ref{fig:errortypes}a). Hinglish summaries are judged wrong most often (15/20, 75\% [53--89\%]), compared with 10/20 for \cond{hi} and 9/20 for \cond{hi-rom}; plain summaries more often than factual ones (19/30 vs.\ 15/30). With 10--20 summaries per group these differences are not significant. In two shared items the annotators tied and the more severe label was used.
 
-\subsection{Agreement with human judgments}
-\begin{itemize}
-  \item \todo{Label distribution (faithful/minor/major) per condition and prompt.}
-  \item \todo{Fleiss' $\kappa$ (3-way and binary) on the 10 shared items; pairwise Cohen's $\kappa$ range.}
-  \item \todo{Point-biserial $r$ and AUC per metric; choose primary NLI variant.}
-  \item \todo{A1 blind labels vs.\ LLM suggestions: agreement, $\kappa$, confusion matrix, revisions (\texttt{draft\_agreement.py}); assisted pass 20/20 as anchoring evidence.}
-\end{itemize}
+\paragraph{Inter-annotator agreement} On the 10 shared summaries agreement is fair for three labels and fair to moderate for faithful vs.\ error, in the terms of Landis and Koch~\cite{landis1977measurement}. Fleiss' $\kappa$ is 0.20 for the three labels and 0.38 for faithful vs.\ error, on the 9 items that all five annotators labelled (one rating is missing). Krippendorff's $\alpha$~\cite{krippendorff2011computing}, which allows the missing rating and uses all 10 items, gives 0.23 and 0.44. Pairwise Cohen's $\kappa$ ranges from $-0.23$ to 0.64 (three labels) and from 0.00 to 0.80 (binary); A1 agrees least with the others (binary 0.00--0.40). The boundary between \emph{faithful} and \emph{minor error} is the main source of disagreement, which is why we use the binary label below.
+
+\paragraph{A1 and the LLM suggestions} Under the blind-first protocol, A1's locked labels agree with the LLM suggestions on 10 of 20 items (Cohen's $\kappa$ = 0.19 for three labels, 0.21 binary), close to the agreement among the human annotators. A1 revised none of the 20 labels after the suggestion was revealed. In the discarded assisted pass, agreement had been 20/20; we read this as anchoring on the suggestion.
+
+\paragraph{Metric--human agreement} No automatic metric separates faithful from erroneous summaries reliably (Fig.~\ref{fig:agreement}). Both NLI variants are at or below chance: NLI-chunk has AUC 0.49 (95\% bootstrap CI 0.34--0.64, $r_{pb} = -0.01$) and NLI-window 0.39 (0.24--0.55, $r_{pb} = -0.14$). We therefore choose \emph{neither} as a primary metric and report both only as descriptive scores. Number precision is 1.0 for all 42 labelled summaries that contain a number, so it carries no signal here (AUC 0.5); entity precision is below 1 for only one summary (AUC 0.52). ROUGE-L (0.60, CI 0.45--0.75) and BERTScore (0.58, CI 0.43--0.72) are slightly above chance, but their intervals include 0.5. NLI-window passes (score $\geq 0.5$) 31 of the 34 erroneous summaries and 10 of the 12 with a major error; NLI-chunk rejects half of the faithful ones (13/26).
 
 % ---------------------------------------------------------------- floats
 \begin{figure}[t]
@@ -115,8 +99,7 @@ Condition & Prompt & Model & Wrong lang. & $n$ & Num P & Num R & Ent P & Ent R &
 
 \begin{figure}[t]
   \centering
-  \fbox{\parbox[c][3.5cm][c]{0.9\columnwidth}{\centering
-    \todo{Figure: agreement of each automatic metric with human labels\\(AUC, faithful vs.\ error, 95\% CI).\\Generated by \texttt{src.analysis.make\_figures} once\\\texttt{src.eval.merge\_annotations} has run.}}}
-  \caption{\todo{Metric--human agreement.}}
+  \includegraphics[width=\columnwidth]{fig_agreement}
+  \caption{Agreement of each automatic metric with the human label on 60 gemma3:4b summaries: AUC for separating faithful from erroneous summaries, with 95\% bootstrap CIs (1,000 resamples). 0.5 = chance. Number precision is 1.0 on every labelled summary that contains a number.}
   \label{fig:agreement}
 \end{figure}

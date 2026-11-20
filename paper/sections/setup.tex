@@ -12,13 +12,13 @@ All metrics run locally on the same laptop (Apple MPS/CPU) without API calls, us
 
 Annotator A1 also had access to suggestion labels written by an LLM (Claude, not one of the evaluated models), each with a quoted justification. To keep A1's labels independent of these suggestions, A1 followed a \emph{blind-first} protocol enforced by the labelling tool:
 \begin{enumerate}
-  \item A1 chooses a label, an error type and (for errors) a note quoting the faulty claim, and then \emph{locks} the decision. The suggestion is not sent to A1's browser before this point.
+  \item A1 chooses a label, an error type and (for errors) a short note, and then \emph{locks} the decision. The suggestion is not sent to A1's browser before this point.
   \item The locked decision is stored with a timestamp and cannot be changed afterwards.
   \item Only then is the suggestion revealed. A1 may record a revised label, which is stored separately.
 \end{enumerate}
 All analyses use the locked blind labels; revisions are reported only to show how often the suggestion changed A1's judgment.
 
-An earlier pass in which A1 saw the suggestions while labelling agreed with them on all 20 items, which is why it was discarded and redone under this protocol. On the blind pass, A1's labels agree with the suggestions on \todo{$k$/20} items (Cohen's $\kappa$ = \todo{x} for three labels, \todo{x} for faithful vs.\ error), and A1 revised \todo{$m$} labels after seeing the suggestion (\todo{$m'$} of them towards it). These numbers are produced by \texttt{src/eval/draft\_agreement.py}.
+An earlier pass in which A1 saw the suggestions while labelling agreed with them on all 20 items, which is why it was discarded and redone under this protocol. On the blind pass, A1's labels agree with the suggestions on 10 of 20 items (Section~\ref{sec:human}).
 
 \paragraph{Threats to validity}
 \begin{itemize}

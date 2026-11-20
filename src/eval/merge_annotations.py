@@ -27,6 +27,14 @@ Agreement on the 10 shared rows (3 labels: faithful / minor / major):
   - Cohen's kappa for every PAIR of annotators:
       kappa = (p_observed - p_expected) / (1 - p_expected),
       p_expected = sum over labels of p_A(label) * p_B(label).
+  - Krippendorff's alpha (nominal): like Fleiss' kappa but it allows MISSING
+    ratings (A3 left one shared row empty), so it uses all 10 shared rows.
+      every item with m >= 2 ratings adds each ordered pair of its ratings
+      (c, k) to a coincidence table o_ck with weight 1 / (m - 1);
+      n_c = sum_k o_ck,  n = sum_c n_c
+      alpha = 1 - (n - 1) * sum_{c != k} o_ck / sum_{c != k} n_c n_k
+    Fleiss' kappa needs the same raters on every item, so it is computed on
+    the rows labelled by all five (a missing rating is never guessed).
   Both are also printed for the binary version (faithful vs any error), which
   is what agreement.py uses. Rough reading (Landis & Koch 1977): < 0.2 slight,
   0.2-0.4 fair, 0.4-0.6 moderate, 0.6-0.8 substantial, > 0.8 almost perfect.
@@ -72,6 +80,27 @@ def fleiss_kappa(items: list, categories: list) -> float:
     p_cat = [sum(row[j] for row in counts) / (len(items) * n) for j in range(len(categories))]
     p_bar, p_e = sum(p_item) / len(items), sum(p * p for p in p_cat)
     return float("nan") if p_e == 1 else (p_bar - p_e) / (1 - p_e)
+
+
+def krippendorff_alpha(items: list) -> float:
+    """Nominal Krippendorff's alpha. items: one list of labels per item;
+    items may have different numbers of ratings (missing ones left out)."""
+    o = Counter()  # coincidence table o[(c, k)]
+    for item in items:
+        m = len(item)
+        if m < 2:
+            continue  # a single rating cannot be compared with anything
+        for i in range(m):
+            for j in range(m):
+                if i != j:
+                    o[(item[i], item[j])] += 1 / (m - 1)
+    n_c = Counter()
+    for (c, _), v in o.items():
+        n_c[c] += v
+    n = sum(n_c.values())
+    disagree = sum(v for (c, k), v in o.items() if c != k)
+    expected = sum(n_c[c] * n_c[k] for c in n_c for k in n_c if c != k)
+    return float("nan") if expected == 0 else 1 - (n - 1) * disagree / expected
 
 
 def cohen_kappa(a: list, b: list) -> float:
@@ -136,11 +165,19 @@ def report_agreement(long: pd.DataFrame, assign: pd.DataFrame):
     table = shared.pivot_table(index=KEY, columns="annotator", values="label", aggfunc="first")
     complete = table.dropna()
     print(f"\nAgreement on shared rows: {len(raters)} annotators ({', '.join(raters)}), "
-          f"{len(complete)} rows labelled by all of them")
+          f"{len(table)} rows, {len(complete)} labelled by all of them, "
+          f"{int(table.isna().sum().sum())} rating(s) missing")
     if len(raters) >= 2 and len(complete) >= 2:
         items = complete.values.tolist()
-        print(f"  Fleiss' kappa, 3 labels:           {fleiss_kappa(items, list(SEVERITY)):.3f}")
-        print(f"  Fleiss' kappa, faithful vs error:  {fleiss_kappa([binary(i) for i in items], ['faithful', 'error']):.3f}")
+        print(f"  Fleiss' kappa, 3 labels         (n={len(items)} complete rows): "
+              f"{fleiss_kappa(items, list(SEVERITY)):.3f}")
+        print(f"  Fleiss' kappa, faithful vs error (n={len(items)} complete rows): "
+              f"{fleiss_kappa([binary(i) for i in items], ['faithful', 'error']):.3f}")
+        all_items = [[x for x in row if isinstance(x, str)] for row in table.values.tolist()]
+        print(f"  Krippendorff's alpha, 3 labels         (all {len(all_items)} rows): "
+              f"{krippendorff_alpha(all_items):.3f}")
+        print(f"  Krippendorff's alpha, faithful vs error (all {len(all_items)} rows): "
+              f"{krippendorff_alpha([binary(i) for i in all_items]):.3f}")
     if len(raters) < 5:
         print("  (not all five annotators yet - these are not the final numbers)")
 
@@ -152,6 +189,30 @@ def report_agreement(long: pd.DataFrame, assign: pd.DataFrame):
         k3 = cohen_kappa(list(both[a]), list(both[b]))
         k2 = cohen_kappa(binary(list(both[a])), binary(list(both[b])))
         print(f"    {a}-{b}: {k3:6.3f} / {k2:6.3f}   (n={len(both)})")
+
+
+def report_error_types(long: pd.DataFrame, out: pd.DataFrame):
+    """Error-type statistics. A2 and A3 gave labels but no error types, so
+    the types come only from annotators who gave them; n is always printed."""
+    typed_by = sorted(a for a, g in long.groupby("annotator")
+                      if (g.loc[g["label"] != "faithful", "error_type"] != "").any())
+    print(f"\nError types (only annotators who gave types: {', '.join(typed_by)})")
+    for a in typed_by:
+        g = long[(long["annotator"] == a) & (long["label"] != "faithful")]
+        print(f"  {a} ({len(g)} error labels): " + ", ".join(f"{t} {c}" for t, c in
+                                                         g["error_type"].value_counts().items()))
+    err = out[out["label"].isin(["minor_error", "major_error"])]
+    typed = err[err["error_type"] != ""]
+    print(f"  FINAL labels: {len(typed)} of {len(err)} error summaries have a type: "
+          + ", ".join(f"{t} {c}" for t, c in typed["error_type"].value_counts().items()))
+
+    print("\nFinal labels by condition x prompt (faithful / minor / major ; typed errors)")
+    for (c, p), g in out[out["label"] != ""].groupby(["condition", "prompt_type"]):
+        e = g[g["label"] != "faithful"]
+        types = e.loc[e["error_type"] != "", "error_type"].value_counts()
+        print(f"  {c:<9} {p:<8} " + " / ".join(str((g['label'] == lab).sum()) for lab in SEVERITY)
+              + f" ; {int(types.sum())}/{len(e)} typed: "
+              + ", ".join(f"{t} {n}" for t, n in types.items()))
 
 
 def main():
@@ -184,6 +245,7 @@ def main():
     print(f"\nFinal labels: {len(done)}/{len(out)} summaries  "
           + "  ".join(f"{lab}: {(done['label'] == lab).sum()}" for lab in SEVERITY))
     print(f"Wrote {ALL_LABELS_PATH} ({len(long)} individual labels) and {ANNOTATION_PATH}")
+    report_error_types(long, out)
     if len(done) < len(out):
         print("Some summaries have no label yet; agreement.py uses only the labelled ones.")
 
