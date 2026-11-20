@@ -214,9 +214,19 @@ Everything runs locally (CPU/Apple MPS); no API calls. Only summaries that passe
 ```bash
 python -m src.evaluate --model gemma3:4b            # resumable; ~30 min on an 8 GB Mac
 python -m src.eval.make_annotation_set              # 60 summaries for hand labelling (never overwritten)
-python -m src.eval.agreement                        # after hand labelling: metrics vs human labels
+python -m src.eval.make_annotation_packs            # split across 5 annotators + offline pages A2-A5
+python -m src.eval.label_server                     # A1's labelling page at http://127.0.0.1:8765
+python -m src.eval.merge_annotations                # merge 5 label files, Fleiss/Cohen kappa
+python -m src.eval.agreement                        # then: metrics vs final human labels
 python -c "from src.eval.entities import tune_threshold; tune_threshold()"
 ```
+
+**Manual labels (5 annotators).** The 60 summaries are labelled by a team of five (A1-A5), following `results/annotation_packs/GUIDELINES.md`.
+- **Split** (`results/annotation_packs/assignment.csv`): 10 *shared* rows labelled by all five (for agreement) and 50 rows split 10 per annotator. It is stratified, so every annotator and the shared set get rows from all six condition × prompt cells. Each annotator sees 20 rows in their own random order and does not know which rows are shared.
+- **A1** labels with `label_server.py` into `labels_A1.csv`, in blind mode by default.
+- **A2-A5** label offline in a self-contained page (`A2.html` etc., opened by double-click in Chrome). Labels autosave in the browser, and a button exports `labels_A2.csv`. These pages contain **no LLM draft labels**.
+- **Merge** (`merge_annotations.py`): writes every individual label to `all_labels.csv` and one *final* label per summary to `results/manual_annotation.csv` (columns `set`, `annotator`, `label`, `error_type`, `notes`). Shared rows take the majority label; a tie goes to the more severe label. The script prints Fleiss' kappa (all five) and pairwise Cohen's kappa on the shared rows, for 3 labels and for faithful vs error. `agreement.py` uses these final labels.
+- **Drafts and anchoring.** `draft_label`, `draft_error_type` and `draft_note` are suggestions written by an LLM (Claude), shown only to A1. `label_source` records how A1's labels relate to the draft (`same_as_draft`, `changed_from_draft`, `_blind` if the draft was hidden), `blind_pack` for teammates, and `majority` / `majority_tie` for merged shared rows. Labels copied from a draft are not independent human judgments, so report these counts alongside the agreement numbers.
 
 **Outputs**
 - `results/scores_<model>.csv`: one row per summary.
@@ -249,10 +259,10 @@ python -c "from src.eval.entities import tune_threshold; tune_threshold()"
 | Condition | Prompt | n | Num P | Num R | Ent P | Ent R | NLI chunk | NLI window | ROUGE-2 src | BERTScore |
 |---|---|---|---|---|---|---|---|---|---|---|
 | hi | plain | 186 | 0.979 | 0.230 | 0.974 | 0.475 | 0.742 | 0.745 | 0.141 | 0.749 |
-| hi | factual | 186 | 0.970 | 0.557 | 0.994 | 0.661 | 0.613 | 0.727 | 0.259 | 0.787 |
-| hi_roman | plain | 186 | 0.999 | 0.391 | 0.995 | 0.553 | 0.475 | 0.713 | 0.388 | 0.788 |
+| hi | factual | 186 | 0.970 | 0.556 | 0.994 | 0.661 | 0.613 | 0.727 | 0.259 | 0.787 |
+| hi_roman | plain | 186 | 0.999 | 0.390 | 0.995 | 0.553 | 0.475 | 0.713 | 0.388 | 0.788 |
 | hi_roman | factual | 180 | 1.000 | 0.513 | 1.000 | 0.624 | 0.454 | 0.708 | 0.440 | 0.792 |
-| hinglish | plain | 176 | 0.979 | 0.351 | 0.979 | 0.534 | 0.511 | 0.632 | 0.248 | 0.746 |
+| hinglish | plain | 176 | 0.981 | 0.352 | 0.979 | 0.534 | 0.511 | 0.632 | 0.248 | 0.746 |
 | hinglish | factual | 169 | 1.000 | 0.523 | 0.997 | 0.675 | 0.397 | 0.647 | 0.419 | 0.786 |
 
 **Main observations**
@@ -273,7 +283,7 @@ python -c "from src.eval.entities import tune_threshold; tune_threshold()"
 - **`hi_roman` entity precision is optimistic (1.000).** Romanized Hindi summaries are all lowercase, so the only candidates are gold entities found in the summary; a hallucinated lowercase name can't be detected.
 - **Other approximations:**
   - Stanza sometimes merges or misses entities. A merged multi-word entity counts as supported if each of its words is found in the source, so a mix-up of two real names isn't detected.
-  - The number parser ignores a lone "ek"/"एक" (usually the article "a"), and it reads the surname "Das" as 10.
+  - The number parser ignores a lone "ek"/"एक" (usually the article "a"), and it reads the surname "Das" as 10. It handles arab/अरब (10⁹) only after a number, so "Saudi Arab" isn't read as a number.
   - Rounding ("दो लाख से अधिक" for 2 lakh 30 hazaar) counts as an altered number.
   - ROUGE F1 against the source is low in absolute terms because the source is much longer than the summary; compare conditions, not absolute values.
 

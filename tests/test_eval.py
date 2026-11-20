@@ -80,3 +80,9 @@ def test_sentence_windows():
     from src.eval.nli import sentence_windows
     assert sentence_windows("A b. C d. E f.") == ["A b. C d.", "C d. E f."]
     assert sentence_windows("Only one.") == ["Only one."]
+
+
+def test_arab_multiplier():
+    assert extract_numbers("700 arab dollar ka package") == {700_000_000_000}
+    assert extract_numbers("700 अरब डॉलर") == extract_numbers("700 billion dollar")
+    assert extract_numbers("Saudi Arab ke 3 shahar") == {3}   # "Arab" alone is a name

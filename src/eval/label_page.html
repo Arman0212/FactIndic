@@ -1,0 +1,243 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>FactIndic Labelling</title>
+<style>
+  :root {
+    --bg: #f7f6f3; --panel: #ffffff; --ink: #1d1d1f; --muted: #6b6b70; --line: #e3e1dc;
+    --accent: #2f5bd3; --name-bg: #e3ecff; --name-ink: #1f3f99; --num-bg: #fff1cc; --num-ink: #7a5300;
+    --bad: #c62828; --ok: #2e7d32; --minor: #b26a00; --major: #c62828; --chip: #efede8;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #161618; --panel: #1f1f22; --ink: #ececee; --muted: #9a9aa2; --line: #333338;
+      --accent: #8aa8ff; --name-bg: #233257; --name-ink: #c9d7ff; --num-bg: #4a3a12; --num-ink: #ffe3a3;
+      --bad: #ff6b6b; --ok: #7bd389; --minor: #ffb74d; --major: #ff6b6b; --chip: #2a2a2e;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink);
+         font: 15px/1.55 -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans", "Noto Sans Devanagari", "Kohinoor Devanagari", sans-serif; }
+  header { position: sticky; top: 0; z-index: 2; display: flex; flex-wrap: wrap; gap: 10px 16px; align-items: center;
+           padding: 10px 16px; background: var(--panel); border-bottom: 1px solid var(--line); }
+  header h1 { font-size: 15px; margin: 0; font-weight: 650; }
+  .chip { background: var(--chip); border-radius: 999px; padding: 2px 10px; font-size: 13px; }
+  .progress { flex: 1; min-width: 140px; height: 6px; background: var(--chip); border-radius: 3px; overflow: hidden; }
+  .progress > div { height: 100%; background: var(--accent); width: 0; transition: width .2s; }
+  button, select, textarea { font: inherit; color: inherit; }
+  button { background: var(--chip); border: 1px solid var(--line); border-radius: 8px; padding: 6px 12px; cursor: pointer; }
+  button:hover { border-color: var(--accent); }
+  button.primary { background: var(--accent); color: #fff; border-color: var(--accent); }
+  main { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; padding: 16px; max-width: 1500px; margin: 0 auto; }
+  @media (max-width: 900px) { main { grid-template-columns: 1fr; } }
+  section { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; min-width: 0; }
+  section h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); margin: 0 0 8px; }
+  .text { white-space: pre-wrap; overflow-wrap: anywhere; font-size: 16px; line-height: 1.75; }
+  #source { max-height: calc(100vh - 150px); overflow-y: auto; }
+  .name { background: var(--name-bg); color: var(--name-ink); border-radius: 3px; padding: 0 1px; }
+  .num { background: var(--num-bg); color: var(--num-ink); border-radius: 3px; padding: 0 1px; font-weight: 600; }
+  .bad { outline: 2px dashed var(--bad); outline-offset: 1px; }
+  .legend { font-size: 12px; color: var(--muted); margin-top: 6px; }
+  .legend span { margin-right: 10px; }
+  .draft { margin-top: 14px; border: 1px dashed var(--line); border-radius: 10px; padding: 10px 12px; }
+  .draft.hidden-draft .draft-body { display: none; }
+  .draft .lbl { font-weight: 650; }
+  .lbl.faithful { color: var(--ok); } .lbl.minor_error { color: var(--minor); } .lbl.major_error { color: var(--major); }
+  .draft-note { font-size: 14px; margin-top: 4px; overflow-wrap: anywhere; }
+  .yours { margin-top: 14px; display: grid; gap: 10px; }
+  .labels { display: flex; flex-wrap: wrap; gap: 8px; }
+  .labels button[aria-pressed="true"] { color: #fff; }
+  .labels button[data-v="faithful"][aria-pressed="true"] { background: var(--ok); border-color: var(--ok); }
+  .labels button[data-v="minor_error"][aria-pressed="true"] { background: var(--minor); border-color: var(--minor); }
+  .labels button[data-v="major_error"][aria-pressed="true"] { background: var(--major); border-color: var(--major); }
+  select, textarea { background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 6px 8px; width: 100%; }
+  textarea { min-height: 90px; resize: vertical; }
+  .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .status { font-size: 13px; color: var(--muted); min-height: 1em; }
+  .nav { display: flex; gap: 8px; justify-content: space-between; margin-top: 6px; }
+  .keys { font-size: 12px; color: var(--muted); }
+  label.toggle { font-size: 13px; display: flex; gap: 6px; align-items: center; }
+</style>
+</head>
+<body>
+<header>
+  <h1>FactIndic labelling · A1 (your 10 + 10 shared)</h1>
+  <span class="chip" id="pos">-</span>
+  <span class="chip" id="cond">-</span>
+  <span class="chip" id="rid" title="article id">-</span>
+  <div class="progress" title="labelled"><div id="bar"></div></div>
+  <span class="chip" id="done">0 labelled</span>
+  <label class="toggle"><input type="checkbox" id="blind" checked> Blind mode (hide draft until I label)</label>
+</header>
+
+<main>
+  <section>
+    <h2>Source article</h2>
+    <div id="source" class="text"></div>
+  </section>
+
+  <section>
+    <h2>Summary</h2>
+    <div id="summary" class="text"></div>
+    <div class="legend">
+      <span class="name">name</span><span class="num">number</span>
+      <span class="name bad">not found in source</span> (automatic check, may be wrong)
+    </div>
+
+    <div class="draft" id="draftBox">
+      <div class="row"><strong>Draft suggestion</strong>
+        <button id="accept" class="primary" title="shortcut: A">Accept draft</button></div>
+      <div class="draft-body">
+        <div><span class="lbl" id="dLabel"></span> <span id="dType" class="chip"></span></div>
+        <div class="draft-note" id="dNote"></div>
+      </div>
+      <div class="draft-hidden-msg status" id="hiddenMsg"></div>
+    </div>
+
+    <div class="yours">
+      <strong>Your label</strong>
+      <div class="labels">
+        <button data-v="faithful" title="shortcut: 1">1 · faithful</button>
+        <button data-v="minor_error" title="shortcut: 2">2 · minor error</button>
+        <button data-v="major_error" title="shortcut: 3">3 · major error</button>
+      </div>
+      <select id="etype" aria-label="error type">
+        <option value="">error type (leave empty if faithful)</option>
+        <option value="entity">entity</option>
+        <option value="number">number</option>
+        <option value="added_info">added_info</option>
+        <option value="meaning">meaning</option>
+        <option value="omission">omission</option>
+        <option value="other">other</option>
+      </select>
+      <textarea id="notes" placeholder="Notes (saved automatically)"></textarea>
+      <div class="status" id="status"></div>
+      <div class="nav">
+        <button id="prev">← Prev</button>
+        <button id="nextUn">Next unlabelled</button>
+        <button id="next">Next →</button>
+      </div>
+      <div class="keys">Keys: ← → navigate · 1 2 3 label · A accept draft (not while typing in notes)</div>
+    </div>
+  </section>
+</main>
+
+<script>
+let rows = [], cur = 0, saveTimer = null;
+const $ = (id) => document.getElementById(id);
+const PRETTY = { faithful: "faithful", minor_error: "minor error", major_error: "major error" };
+
+function store(key, val) { try { if (val === undefined) return localStorage.getItem(key); localStorage.setItem(key, val); } catch (e) { return null; } }
+
+function render(el, segs) {
+  el.replaceChildren();
+  for (const s of segs) {
+    if (!s.k) { el.append(document.createTextNode(s.t)); continue; }
+    const span = document.createElement("span");
+    span.className = s.k;
+    if (s.k.includes("bad")) span.title = "not found in source by the automatic check";
+    span.textContent = s.t;
+    el.append(span);
+  }
+}
+
+function draftVisible(r) { return !$("blind").checked || !!r.label; }
+
+function show() {
+  const r = rows[cur];
+  $("pos").textContent = `Row ${cur + 1} / ${rows.length}`;
+  $("cond").textContent = `${r.condition} · ${r.prompt_type}`;
+  $("rid").textContent = r.id;
+  render($("source"), r.source_seg);
+  render($("summary"), r.summary_seg);
+  $("source").scrollTop = 0;
+  $("dLabel").textContent = PRETTY[r.draft_label] || r.draft_label;
+  $("dLabel").className = "lbl " + r.draft_label;
+  $("dType").textContent = r.draft_error_type || "no error";
+  $("dNote").textContent = r.draft_note;
+  const vis = draftVisible(r);
+  $("draftBox").classList.toggle("hidden-draft", !vis);
+  $("accept").hidden = !vis;
+  $("hiddenMsg").textContent = vis ? "" : "Draft hidden - choose your label first.";
+  document.querySelectorAll(".labels button").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.v === r.label)));
+  $("etype").value = r.error_type || "";
+  $("notes").value = r.notes || "";
+  $("status").textContent = r.label ? `Saved · ${r.label_source || ""}` : "";
+  updateProgress();
+}
+
+function updateProgress() {
+  const n = rows.filter(r => r.label).length;
+  $("done").textContent = `${n}/${rows.length} labelled`;
+  $("bar").style.width = (100 * n / rows.length) + "%";
+}
+
+async function save(fields) {
+  const r = rows[cur];
+  const seen = draftVisible(r);
+  Object.assign(r, fields);
+  $("status").textContent = "Saving…";
+  try {
+    const res = await fetch("/api/save", { method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ i: r.i, seen_draft: seen, ...fields }) });
+    const out = await res.json();
+    r.label_source = out.label_source;
+    $("status").textContent = `Saved · ${out.label_source || "no label yet"}`;
+  } catch (e) {
+    $("status").textContent = "NOT saved - is the server still running? (" + e + ")";
+  }
+  updateProgress();
+}
+
+function setLabel(v) {
+  const r = rows[cur];
+  const fields = { label: v };
+  if (v === "faithful") fields.error_type = "";      // faithful has no error type
+  else fields.error_type = $("etype").value;
+  save(fields).then(show);
+}
+
+function acceptDraft() {
+  const r = rows[cur];
+  if (!draftVisible(r)) return;
+  save({ label: r.draft_label, error_type: r.draft_error_type }).then(show);
+}
+
+function go(i) { if (i >= 0 && i < rows.length) { flushNotes(); cur = i; store("factindic_cur_A1", String(cur)); show(); } }
+function flushNotes() { if (saveTimer) { clearTimeout(saveTimer); saveTimer = null; save({ notes: $("notes").value }); } }
+
+document.querySelectorAll(".labels button").forEach(b => b.addEventListener("click", () => setLabel(b.dataset.v)));
+$("etype").addEventListener("change", () => { if (rows[cur].label) save({ label: rows[cur].label, error_type: $("etype").value }); else save({ error_type: $("etype").value }); });
+$("notes").addEventListener("input", () => { clearTimeout(saveTimer); saveTimer = setTimeout(() => { saveTimer = null; save({ notes: $("notes").value }); }, 600); });
+$("notes").addEventListener("blur", flushNotes);
+$("accept").addEventListener("click", acceptDraft);
+$("prev").addEventListener("click", () => go(cur - 1));
+$("next").addEventListener("click", () => go(cur + 1));
+$("nextUn").addEventListener("click", () => {
+  for (let k = 1; k <= rows.length; k++) { const j = (cur + k) % rows.length; if (!rows[j].label) return go(j); }
+  $("status").textContent = "All rows are labelled.";
+});
+$("blind").addEventListener("change", () => { store("factindic_blind_A1", $("blind").checked ? "1" : "0"); show(); });
+document.addEventListener("keydown", (e) => {
+  if (e.target.tagName === "TEXTAREA" || e.target.tagName === "SELECT" || e.metaKey || e.ctrlKey) return;
+  if (e.key === "ArrowLeft") go(cur - 1);
+  else if (e.key === "ArrowRight") go(cur + 1);
+  else if (e.key === "1") setLabel("faithful");
+  else if (e.key === "2") setLabel("minor_error");
+  else if (e.key === "3") setLabel("major_error");
+  else if (e.key === "a" || e.key === "A") acceptDraft();
+});
+window.addEventListener("beforeunload", flushNotes);
+
+(async () => {
+  $("blind").checked = store("factindic_blind_A1") !== "0";  // blind mode ON unless switched off
+  rows = (await (await fetch("/api/rows")).json()).rows;
+  const saved = parseInt(store("factindic_cur_A1") || "", 10);
+  cur = Number.isInteger(saved) && saved < rows.length ? saved : Math.max(0, rows.findIndex(r => !r.label));
+  show();
+})();
+</script>
+</body>
+</html>

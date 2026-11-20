@@ -58,6 +58,8 @@ MULTIPLIERS = {
     "hazaar": 1000, "hazar": 1000, "hajar": 1000, "thousand": 1000,
     "lakh": 100_000, "lac": 100_000,
     "crore": 10_000_000, "karod": 10_000_000, "karor": 10_000_000,
+    "arab": 1_000_000_000, "kharab": 100_000_000_000,  # अरब, खरब (only after a number,
+                                                        # so "Saudi Arab" is unaffected)
     "million": 1_000_000, "billion": 1_000_000_000,
 }
 

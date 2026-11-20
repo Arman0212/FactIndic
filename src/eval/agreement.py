@@ -1,8 +1,11 @@
 """
 FactIndic - Phase 4: agreement of automatic metrics with human labels
 =====================================================================
-Run this AFTER filling in the `label` column of results/manual_annotation.csv
-(faithful / minor_error / major_error). It answers: which automatic score
+Run this AFTER merging the five annotators' labels:
+    python -m src.eval.merge_annotations
+which writes the FINAL label of every summary (majority vote on the 10
+shared rows) into the `label` column of results/manual_annotation.csv.
+It answers: which automatic score
 best separates faithful summaries from summaries with errors? We use this to
 choose the primary NLI variant (nli_chunk vs nli_window).
 
@@ -44,10 +47,13 @@ def main():
     args = parser.parse_args()
 
     ann = pd.read_csv(ANNOTATION_PATH, encoding="utf-8-sig")
+    if "annotator" not in ann.columns:
+        print("Labels not merged yet - run: python -m src.eval.merge_annotations")
+        return
     ann["label"] = ann["label"].astype(str).str.strip().str.lower()
     ann = ann[ann["label"].isin(LABELS)]
     if ann.empty:
-        print(f"No labels yet in {ANNOTATION_PATH} (use faithful / minor_error / major_error).")
+        print(f"No final labels yet in {ANNOTATION_PATH} - run src.eval.merge_annotations first.")
         return
     ann["faithful"] = ann["label"].map(LABELS)
 
